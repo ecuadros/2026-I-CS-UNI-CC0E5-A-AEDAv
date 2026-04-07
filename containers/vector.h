@@ -74,6 +74,28 @@ ostream& operator<<(ostream& os, Vector<T>& v){
 // TODO: Implementar como PR
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    string input;
+    is >> input;
+    if(input.empty() || input.front() != '[' || input.back() != ']')
+        throw std::invalid_argument("Invalid input format");
+    input = input.substr(1, input.size() - 2);
+
+    istringstream iss(input);
+    string str;
+
+    while(getline(iss, str, ',')){
+        istringstream eStream(str);
+        T valor;
+        if(eStream >> valor) {
+            string r;
+            if(eStream >> r) { // 1 A 2
+                throw std::invalid_argument("Invalid input format for an element");
+            }
+            v.push_back(valor);
+        } else {
+            throw std::invalid_argument("Error parsing the element");
+        }
+    }
     return is;
 }
 
