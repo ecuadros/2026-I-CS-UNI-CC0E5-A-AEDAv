@@ -71,9 +71,21 @@ ostream& operator<<(ostream& os, Vector<T>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar como PR
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    char ch;
+    if(!(is >> ch) || ch != '[') return is;
+    string line;
+    if(!getline(is, line, ']')) return is;
+    istringstream iss(line);
+    string item;
+    while(getline(iss, item, ',')){
+        if(item.empty()) continue;
+        istringstream tss(item);
+        T value;
+        if(tss >> value)
+            v.push_back(value);
+    }
     return is;
 }
 

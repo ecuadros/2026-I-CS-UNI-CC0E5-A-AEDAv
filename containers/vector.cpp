@@ -28,9 +28,17 @@ void DemoVector(){
     cout << v2 << endl;
     cout << v2.toString() << endl;
 
-    ofstream of("temp.txt");
-    of << v1 << endl;
-    of << v2 << endl;
-    // of.close();
-    
+    {
+        ofstream of("temp.txt");
+        of << v1 << endl;
+        of << v2 << endl;
+    }
+
+    ifstream ifs("temp.txt");
+    Vector<T1> v3(10);
+    Vector<string> v4(10);
+    ifs >> v3 >> v4;
+
+    cout << v3 << endl;
+    cout << v4 << endl;
 }
