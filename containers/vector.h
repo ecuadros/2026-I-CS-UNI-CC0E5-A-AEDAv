@@ -79,6 +79,7 @@ public:
     virtual void push_back(value_type value, Ref ref);
     virtual value_type  get(size_t index);
     virtual size_t size();
+    virtual void clear();
     virtual string toString();
 
     forward_iterator begin() { return forward_iterator(this, m_data); }
@@ -160,9 +161,67 @@ ostream& operator<<(ostream& os, Vector<T>& v){
     return os << v.toString();
 }
 
+template <typename T>
+void Vector<T>::clear(){
+    m_size = 0;
+}
+
 // TODO: Implementar como PR
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    v.clear(); // Reiniciar el tamaño del vector para leer nuevos datos
+
+    Char ch;
+    is >> ch;
+
+    if(ch != '['){
+        is.setstate(ios::failbit);
+        return is;
+    }
+
+    while(true){
+        is >> ch;
+
+        if(ch == ']') break; // vector vacío o fin
+
+        if(ch != '('){
+            is.setstate(ios::failbit);
+            return is;
+        }
+
+        T value;
+        Ref ref;
+
+        is >> value;
+
+        is >> ch; // coma
+        if(ch != ','){
+            is.setstate(ios::failbit);
+            return is;
+        }
+
+        is >> ref;
+
+        is >> ch; // ')'
+        if(ch != ')'){
+            is.setstate(ios::failbit);
+            return is;
+        }
+
+        v.push_back(value, ref);
+
+        is >> ch;
+
+        if(ch == ']'){
+            break;
+        }
+
+        if(ch != ','){
+            is.setstate(ios::failbit);
+            return is;
+        }
+    }
+
     return is;
 }
 
