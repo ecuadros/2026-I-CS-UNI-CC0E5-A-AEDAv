@@ -40,9 +40,19 @@ void DemoVector(){
     cout << v2.toString() << endl;
 
     ofstream of("temp.txt");
+    cout <<"Usando ofsteam para escribir en temp.txt" << endl;
     of << v1 << endl;
     of << v2 << endl;
+    of << "Adios" << endl;
+    
     // of.close();
+
+    ifstream ifs("temp.txt");
+    Vector<T1> v3;
+    cout << "Usando ifstream para leer de temp.txt" << endl;
+    ifs >> v3;
+    cout << v3.toString() << endl;;
+    cout << "Termino de leer v3" << endl;
 
     ForEach(v1, AddOne);
     Print(v1, cout);
