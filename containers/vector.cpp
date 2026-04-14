@@ -32,5 +32,20 @@ void DemoVector(){
     of << v1 << endl;
     of << v2 << endl;
     // of.close();
+
+    // Vector vacio
+    Vector<T1> v3(10);
+    cout << v3 << endl;
+
+    // Vector in
+    Vector<int> v_cin(10);
+    cout << "Numeros separados por coma : ";
+    cin >> v_cin;
+    cout << "v_cin: " << v_cin << endl;
+
+    ifstream ifs("temp.txt");
+    Vector<int> v_ifs(10);
+    ifs >> v_ifs;
+    cout << "temp.txt: " << v_ifs << endl;
     
 }
