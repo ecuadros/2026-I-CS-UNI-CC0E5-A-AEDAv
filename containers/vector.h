@@ -56,6 +56,9 @@ size_t Vector<T>::size(){
 
 template <typename T>
 string Vector<T>::toString(){
+    if (m_size == 0)
+        return "[]";
+
     ostringstream oss;
     oss << "[";
     for(size_t i = 0; i < m_size - 1; ++i)
@@ -74,6 +77,30 @@ ostream& operator<<(ostream& os, Vector<T>& v){
 // TODO: Implementar como PR
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    char c; 
+    
+    is >> c;
+    if (c != '[') {
+        is.setstate(ios::failbit); 
+        return is;
+    }
+
+    if ((is >> ws).peek() == ']')
+        return is >> c;
+           
+    T m_data;
+    
+    while (is >> m_data) {
+        v.push_back(m_data); 
+        is >> c; 
+        if (c == ']') 
+            break; 
+        else if (c != ',') {
+            is.setstate(ios::failbit); 
+            break; 
+        }
+    }
+    
     return is;
 }
 
