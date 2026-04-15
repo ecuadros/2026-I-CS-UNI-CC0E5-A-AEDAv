@@ -75,6 +75,9 @@ private:
     size_t  m_capacity;
     size_t  m_size;
     Node   *m_data;
+    // MEJORA: se podria usar shared_mutex en vez de mutex para que varios threads
+    // puedan leer al mismo tiempo (ForEach con shared_lock) y solo bloquear
+    // cuando alguien escribe (push_back con unique_lock)
     mutex   m_mtx;
     void    resize();
 public:
@@ -90,15 +93,17 @@ public:
     backward_iterator rbegin() { return backward_iterator(this, m_data + m_size - 1); }
     backward_iterator rend()   { return backward_iterator(this, m_data - 1); }
     
-    // TODO: Agregar control concurrente
+    // DONE: ForEach Concurrente
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&...  args){
+        scoped_lock lock(m_mtx);
         ::ForEach(begin(), end(), func, std::forward<Args>(args)... );
     }
 
-    // TODO: Agregar control concurrente
+    // DONE: ReverseForEach Concurrente
     template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args &&...  args){
+        scoped_lock lock(m_mtx);
         ::ForEach(rbegin(), rend(), func, std::forward<Args>(args)... );
     }
 };
@@ -155,9 +160,27 @@ ostream& operator<<(ostream& os, Vector<T>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar
+// DONE: Operador >>
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    char ch;
+    is >> ch;
+    if(ch != '['){
+        is.setstate(ios::failbit);
+        return is;
+    }
+    if((is >> ws).peek() == ']')
+        return is >> ch;
+    T data;
+    while(is >> data){
+        v.push_back(data);
+        is >> ch;
+        if(ch == ']') break;
+        else if(ch != ','){
+            is.setstate(ios::failbit);
+            break;
+        }
+    }
     return is;
 }
 
