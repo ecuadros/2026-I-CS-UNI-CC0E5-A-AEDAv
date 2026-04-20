@@ -1,3 +1,5 @@
+#ifndef __UTIL_H__
+#define __UTIL_H__
 
 #include <ostream>
 using namespace std;
@@ -29,3 +31,5 @@ void ForEach(Container& container, Func func, Args&&... args){
     ForEach(container.begin(), container.end(),
             func, forward<Args>(args)...);
 }
+
+#endif // __UTIL_H__

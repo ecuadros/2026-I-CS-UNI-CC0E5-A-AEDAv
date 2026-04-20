@@ -6,6 +6,7 @@
 #include <string>
 #include <sstream>
 #include <shared_mutex> // shared_mutex
+#include <mutex>
 #include "general_iterator.h"
 #include "util.h"
 #include "../types.h"
