@@ -5,6 +5,7 @@
 #include <cstddef> // size_t
 #include <string>
 #include <sstream>
+#include <mutex>
 #include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
 #include "util.h"
