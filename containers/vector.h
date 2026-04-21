@@ -3,13 +3,16 @@
 
 #include <iostream>
 #include <cstddef> // size_t
+#include <mutex>
 #include <string>
 #include <sstream>
-#include <shared_mutex> // shared_mutex
+#include "shared_mutex_compat.h"
 #include "general_iterator.h"
 #include "util.h"
 #include "../types.h"
 using namespace std;
+
+using vector_shared_mutex = compat_shared_mutex;
 
 template <typename Container>
 class vector_forward_iterator : public general_iterator<Container, vector_forward_iterator<Container>> {
@@ -75,7 +78,7 @@ private:
     size_t  m_capacity;
     size_t  m_size;
     Node   *m_data;
-    mutable shared_mutex m_mtx;
+    mutable vector_shared_mutex m_mtx;
     void    resize();
 public:
     Vector(size_t capacity = 10);
@@ -93,14 +96,14 @@ public:
     // Done: Agregar control concurrente
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&...  args){
-        unique_lock<shared_mutex> lock(m_mtx);
+        unique_lock<vector_shared_mutex> lock(m_mtx);
         ::ForEach(begin(), end(), func, std::forward<Args>(args)... );
     }
 
     // Done: Agregar control concurrente
     template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args &&...  args){
-        unique_lock<shared_mutex> lock(m_mtx);
+        unique_lock<vector_shared_mutex> lock(m_mtx);
         if(m_size == 0)
             return;
         ::ForEach(rbegin(), rend(), func, std::forward<Args>(args)... );
@@ -131,7 +134,7 @@ void Vector<T>::resize(){
 
 template <typename T>
 void Vector<T>::push_back(value_type value, Ref ref){
-    unique_lock<shared_mutex> lock(m_mtx);
+    unique_lock<vector_shared_mutex> lock(m_mtx);
     if(m_size == m_capacity) // Overflow
         resize();
     m_data[m_size++] = Node(value, ref);
@@ -139,13 +142,13 @@ void Vector<T>::push_back(value_type value, Ref ref){
 
 template <typename T>
 size_t Vector<T>::size() const{
-    shared_lock<shared_mutex> lock(m_mtx);
+    shared_lock<vector_shared_mutex> lock(m_mtx);
     return m_size;
 }
 
 template <typename T>
 string Vector<T>::toString() const{
-    shared_lock<shared_mutex> lock(m_mtx);
+    shared_lock<vector_shared_mutex> lock(m_mtx);
     ostringstream oss;
     oss << "[";
     for(size_t i = 0; i < m_size; ++i){

@@ -2,13 +2,14 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <mutex>
 #include <thread>
 #include "vector.h"
 using namespace std;
 
 void AddOne(int& n){
     static mutex mtx;
-    scoped_lock lock(mtx);
+    lock_guard<mutex> lock(mtx);
     ++n;
 }
 

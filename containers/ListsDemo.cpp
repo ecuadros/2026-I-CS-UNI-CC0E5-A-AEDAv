@@ -1,7 +1,7 @@
-#include "linkeclist.h"
+#include "linkedlist.h"
 
 void LinkedListDemo(){
-    LinkedList<T1, DescendingLinkedListTrait<T1>> list;
+    LinkedList<DescendingLinkedListTrait<T1>> list;
     list.insert(1, 15);
     list.insert(2, 25);
     list.insert(3, 35);
