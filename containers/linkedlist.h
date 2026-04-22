@@ -24,7 +24,7 @@ public:
     using Parent = general_iterator<Container, MySelf>;
     using Parent::Parent;
 
-    // T4: impl forward it (opt+) - avanza el iterador al siguiente nodo.
+    // T4: impl forward it 
     MySelf &operator++() {
         if(this->m_pNode != nullptr)
             this->m_pNode = this->m_pNode->getNext();
@@ -96,27 +96,19 @@ private:
 
 public:
     LinkedList() = default;
-    // T1: Copy constructor 
     LinkedList(const LinkedList &other);
-    // T2: Move constructor
     LinkedList(LinkedList &&other) noexcept;
     LinkedList& operator=(const LinkedList &other);
     LinkedList& operator=(LinkedList &&other) noexcept;
-    // T3: Destructor seguro 
     virtual ~LinkedList();
-    // T5: push_front 
     virtual void push_front(value_type value, Ref ref);
-    // T6: pop_front 
     virtual void pop_front();
-    // T7: push_back 
     virtual void push_back(value_type value, Ref ref);
-    // T8: pop_back 
     virtual void pop_back();
 private:
     void internal_insert(Node* &pParent, const value_type &value, Ref ref);
 public:
     virtual void insert(const value_type &value, Ref ref);
-    // T9: operator[]
     virtual value_type& operator[](size_t index);
 
     virtual size_t  size() const;
@@ -132,6 +124,7 @@ public:
 };
 
 template <typename Trait>
+// T1: Copy constructor
 LinkedList<Trait>::LinkedList(const LinkedList &other){
     shared_lock<linked_list_shared_mutex> lock(other.m_mtx);
     Node *current = other.m_pRoot;
@@ -152,6 +145,7 @@ LinkedList<Trait>::LinkedList(const LinkedList &other){
 }
 
 template <typename Trait>
+// T2: Move constructor
 LinkedList<Trait>::LinkedList(LinkedList &&other) noexcept{
     unique_lock<linked_list_shared_mutex> lock(other.m_mtx);
     m_pRoot = other.m_pRoot;
@@ -226,6 +220,7 @@ LinkedList<Trait>& LinkedList<Trait>::operator=(LinkedList &&other) noexcept{
 }
 
 template <typename Trait>
+// T3: Destructor seguro
 LinkedList<Trait>::~LinkedList(){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
 
@@ -240,6 +235,7 @@ LinkedList<Trait>::~LinkedList(){
 }
 
 template <typename Trait>
+// T5: push_front
 void LinkedList<Trait>::push_front(value_type value, Ref ref){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
 
@@ -251,6 +247,7 @@ void LinkedList<Trait>::push_front(value_type value, Ref ref){
 }
 
 template <typename Trait>
+// T6: pop_front
 void LinkedList<Trait>::pop_front(){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
 
@@ -267,6 +264,7 @@ void LinkedList<Trait>::pop_front(){
 }
 
 template <typename Trait>
+// T7: push_back
 void LinkedList<Trait>::push_back(value_type value, Ref ref){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
 
@@ -281,6 +279,7 @@ void LinkedList<Trait>::push_back(value_type value, Ref ref){
 }
 
 template <typename Trait>
+// T8: pop_back
 void LinkedList<Trait>::pop_back(){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
 
@@ -324,6 +323,7 @@ void LinkedList<Trait>::insert(const value_type &value, Ref ref){
 }
 
 template <typename Trait>
+// T9: operator[]
 typename LinkedList<Trait>::value_type& LinkedList<Trait>::operator[](size_t index){
     unique_lock<linked_list_shared_mutex> lock(m_mtx);
     if(index >= m_size)
