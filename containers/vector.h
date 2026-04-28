@@ -5,10 +5,10 @@
 #include <cstddef> // size_t
 #include <string>
 #include <sstream>
-#include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
 #include "util.h"
 #include <mutex>
+#include <shared_mutex>
 #include "../types.h"
 using namespace std;
 
@@ -91,14 +91,14 @@ public:
     backward_iterator rbegin() { return backward_iterator(this, m_data + m_size - 1); }
     backward_iterator rend()   { return backward_iterator(this, m_data - 1); }
     
-    // Done: Agregar control concurrente
+  
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&...  args){
         unique_lock<shared_mutex> lock(m_mtx);
         ::ForEach(begin(), end(), func, std::forward<Args>(args)... );
     }
 
-    // Done: Agregar control concurrente
+   
     template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args &&...  args){
         unique_lock<shared_mutex> lock(m_mtx);
@@ -133,7 +133,7 @@ void Vector<T>::resize(){
 template <typename T>
 void Vector<T>::push_back(value_type value, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx);
-    if(m_size == m_capacity) // Overflow
+    if(m_size == m_capacity) 
         resize();
     m_data[m_size++] = Node(value, ref);
 }
@@ -163,9 +163,28 @@ ostream& operator<<(ostream& os, const Vector<T>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar
 template <typename T>
 istream& operator>>(istream& is, Vector<T>& v){
+    char ch;
+    if (!(is >> ch) || ch != '[') {
+        is.setstate(ios_base::failbit);
+        return is;
+    }
+
+    while (is >> ch && ch != ']') {
+        if (ch != '(') continue;
+
+        T value;
+        Ref ref;
+        char comma;
+        char parenClose;
+        if (is >> value >> comma >> ref >> parenClose && comma == ',' && parenClose == ')') {
+            v.push_back(value, ref);
+        } else {
+            is.setstate(ios_base::failbit);
+            return is;
+        }
+    }
     return is;
 }
 

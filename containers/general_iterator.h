@@ -15,19 +15,21 @@ protected:
 public:
     general_iterator(Container *pContainer, Node *pNode)
         : m_pContainer(pContainer), m_pNode(pNode) {}
-    general_iterator(myself &other) 
+    general_iterator(const myself &other)
           : m_pContainer(other.m_pContainer), m_pNode(other.m_pNode){}
     general_iterator(myself &&other) // Move constructor
-          {   m_pContainer = move(other.m_pContainer);
-              m_pNode      = move(other.m_pNode);
+          {   m_pContainer = other.m_pContainer;
+              m_pNode      = other.m_pNode;
           }
-    IteratorBase operator=(IteratorBase &iter)
-          {   m_pContainer = move(iter.m_pContainer);
-              m_pNode      = move(iter.m_pNode);
+    IteratorBase operator=(const IteratorBase &iter)
+          {   m_pContainer = iter.m_pContainer;
+              m_pNode      = iter.m_pNode;
               return *(IteratorBase *)this; // Pending static_cast?
           }
     Node *getNode() const { return m_pNode; }
     friend bool operator==(const IteratorBase &a, const IteratorBase &b) { return a.getNode() == b.getNode(); }
+    //operator<>
+    friend bool operator!=(const IteratorBase &a, const IteratorBase &b) { return !(a == b); }
     typename Container::value_type &operator*(){
         return m_pNode->getDataRef();
     }
