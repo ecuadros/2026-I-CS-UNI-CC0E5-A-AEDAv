@@ -4,8 +4,8 @@
 #include <utility>
 
 template <typename Container, class IteratorBase> // 
-class general_iterator
-{public:
+class general_iterator{
+public:
     using Node = typename Container::Node;
     using myself = general_iterator<Container, IteratorBase>;
     

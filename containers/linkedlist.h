@@ -33,10 +33,10 @@ public:
 };
 
 // Linked List Node
-template <typename T, typename NodeType = LLNode<T>>
+template <typename T, typename NodeType = void>
 class LLNode{
 protected:
-    using Node = NodeType;
+    using Node = conditional_t<is_void_v<NodeType>, LLNode, NodeType>;
 private:
     T   m_data;
     Ref m_ref;
@@ -59,17 +59,14 @@ public:
 
 // Traits de Ordenamiento
 template <typename T>
-struct AscendingLinkedListTrait{
-    using value_type = T;
+struct AscendingLinkedListTrait : BaseTrait<T, less<T>>{
     using Node = LLNode<T>;
-    using Comp = less<T>;
 };
 
+
 template <typename T>
-struct DescendingLinkedListTrait{
-    using value_type = T;
+struct DescendingLinkedListTrait : BaseTrait<T, greater<T>>{
     using Node = LLNode<T>;
-    using Comp = greater<T>;
 };
 
 // Contenedor Principal LinkedList
@@ -84,12 +81,14 @@ public:
     using forward_iterator = LinkedListForwardIterator<MySelf>;
     friend forward_iterator;
 
-private:
+protected:
     Node *m_pRoot = nullptr;
     Node *m_tail = nullptr;
     size_t m_size = 0;
     Comp   m_comp;
     mutable shared_mutex m_mtx;
+
+private:
     void internal_insert(Node* &pPrev, const value_type &value, Ref ref);
 
 public:
