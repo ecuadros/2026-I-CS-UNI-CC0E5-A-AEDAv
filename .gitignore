@@ -42,3 +42,7 @@
 *.tmp
 main
 temp.txt
+DLLAsc.txt
+DLLDesc.txt
+LLAsc.txt
+LLDesc.txt

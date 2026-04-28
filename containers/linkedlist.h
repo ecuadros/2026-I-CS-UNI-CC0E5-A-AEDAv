@@ -24,27 +24,25 @@ public:
     using Parent = general_iterator<Container, MySelf>;
     using Parent::Parent;
     
-    MySelf operator++() {
-        if (this->m_pNode) {
+    MySelf& operator++() {
+        if (this->m_pNode)
             this->m_pNode = this->m_pNode->getNext();
-        }
         return *this;
     }
 };
 
 // Linked List Node
-template <typename T, typename NodeType = LLNode<T>>
+template <typename T, typename NodeType = void>
 class LLNode{
 protected:
-    using Node = NodeType;
+    using Node = conditional_t<is_void_v<NodeType>, LLNode, NodeType>;
 private:
     T   m_data;
     Ref m_ref;
     Node *m_next;
 public:
     LLNode() : m_data(T()), m_ref(Ref()), m_next(nullptr) {}
-    LLNode(T data, Ref ref) : m_data(data), m_ref(ref), m_next(nullptr) {}
-    LLNode(T data, Ref ref, Node *next) : m_data(data), m_ref(ref), m_next(next) {}
+    LLNode(T data, Ref ref, Node *next = nullptr) : m_data(data), m_ref(ref), m_next(next) {}
     virtual ~LLNode() {}
 
     T      getData() const { return m_data; }
@@ -59,17 +57,13 @@ public:
 
 // Traits de Ordenamiento
 template <typename T>
-struct AscendingLinkedListTrait{
-    using value_type = T;
+struct AscendingLinkedListTrait : BaseTrait<T, less<T>>{
     using Node = LLNode<T>;
-    using Comp = less<T>;
 };
 
 template <typename T>
-struct DescendingLinkedListTrait{
-    using value_type = T;
+struct DescendingLinkedListTrait : BaseTrait<T, greater<T>>{
     using Node = LLNode<T>;
-    using Comp = greater<T>;
 };
 
 // Contenedor Principal LinkedList
@@ -84,13 +78,23 @@ public:
     using forward_iterator = LinkedListForwardIterator<MySelf>;
     friend forward_iterator;
 
-private:
+protected:
     Node *m_pRoot = nullptr;
     Node *m_tail = nullptr;
     size_t m_size = 0;
     Comp   m_comp;
     mutable shared_mutex m_mtx;
-    void internal_insert(Node* &pPrev, const value_type &value, Ref ref);
+    void internal_insert(Node* &pPrev, const value_type &value, Ref ref){
+        if(!pPrev || m_comp(value, pPrev->getDataRef())){
+            pPrev = new Node(value, ref, pPrev);
+            m_size++;
+            if(pPrev->getNext() == nullptr){
+                m_tail = pPrev;
+            }
+            return;
+        }
+        internal_insert(pPrev->getNextRef(), value, ref);
+    };
 
 public:
     LinkedList() {}
@@ -209,19 +213,6 @@ public:
 };
 
 // Implementacion de Metodos de Lista
-template <typename Trait>
-void LinkedList<Trait>::internal_insert(Node* &pPrev, const value_type &value, Ref ref){
-    if(!pPrev || m_comp(value, pPrev->getDataRef())){
-        pPrev = new Node(value, ref, pPrev);
-        m_size++;
-        if(pPrev->getNext() == nullptr){
-            m_tail = pPrev;
-        }
-        return;
-    }
-    internal_insert(pPrev->getNextRef(), value, ref);
-}
-
 template <typename Trait>
 void LinkedList<Trait>::insert(const value_type &value, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx); 
