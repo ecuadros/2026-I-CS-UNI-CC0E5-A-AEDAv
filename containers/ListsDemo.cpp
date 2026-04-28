@@ -9,7 +9,7 @@
 #include "linkedlist.h"
 #include "doublelinkedlist.h"
 #include "circularlinkedlist.h"
-// #include "circulardoublelinkedlist.h"
+#include "circulardoublelinkedlist.h"
 
 using namespace std;
 
@@ -207,7 +207,73 @@ void CircularLinkedListDemo(){
 }
 
 void CircularDoubleLinkedListDemo(){
-    //Completar
+    CircularDoubleLinkedList<AscendingCDLLTrait<T1>> list;
+    list.insert(10, 100);
+    list.insert(20, 200);
+    list.insert(30, 300);
+    cout << "Lista Original: " << list << endl;
+
+        cout << "\nTest de push/pop" << endl;
+    list.push_back(40, 400);
+    list.push_front(5, 50);
+    cout << "Lista luego de push_back(40, 400) y push_front(5, 50): " << list << endl;
+    auto [data_back, ref_back] = list.pop_back();
+    cout << "Pop Back - Dato: " << data_back << " | Metadato (Ref): " << ref_back << endl;
+    auto [data_front, ref_front] = list.pop_front();
+    cout << "Pop Front - Dato: " << data_front << " | Metadato (Ref): " << ref_front << endl;
+
+    cout << "\nTest de concurrencia" << endl;
+    CircularDoubleLinkedList<AscendingCDLLTrait<T1>> listconc;
+    auto worker = [&listconc](int thread_id) {
+        for(int i = 0; i < 1000; i++)            listconc.push_back(i, thread_id);
+    };
+    thread t1(worker, 1);
+    thread t2(worker, 2);
+    thread t3(worker, 3);
+    thread t4(worker, 4);
+    thread t5(worker, 5);
+    t1.join(); t2.join(); t3.join(); t4.join(); t5.join();
+    cout << "Se lanzaron 5 hilos insertando 1000 elementos simultaneamente." << endl;
+    cout << "Tamano de la lista (Esperado 5000): " << listconc.size() << endl;
+    if(listconc.size() == 5000)
+        cout << "Estado: EXITO - El shared_mutex previno condiciones de carrera." << endl;
+    else
+        cout << "Estado: FALLO - Hubo corrupcion de memoria." << endl;
+
+    cout << "\nEscritura/Lectura archivos" << endl;
+    CircularDoubleLinkedList<AscendingCDLLTrait<T1>> list1;
+    DemoList(list1, "CDLLAsc.txt");
+    CircularDoubleLinkedList<DescendingCDLLTrait<T1>> list2;
+    DemoList(list2, "CDLLDesc.txt");
+
+    cout << "\nTest operadores" << endl;
+    CircularDoubleLinkedList<AscendingCDLLTrait<T1>> listOp;
+    cout << "Simulando lectura: [(10, 100), (20, 200), (30, 300)]" << endl;
+    stringstream simulador_input("[(10, 100), (20, 200), (30, 300)]");
+    simulador_input >> listOp;
+    cout << "Lista luego de la lectura (operator<<): " << listOp << endl;
+
+    cout << "\nOperador[]: " << endl;
+    cout << "Indice [0] (operator[]): Dato -> " << listOp[0] << endl;
+    cout << "Indice [2] (operator[]): Dato -> " << listOp[2] << endl;
+
+    cout << "\nTest iteradores" << endl;
+    cout << "Forward iterator: ";
+    for (auto &v : listOp)        cout << "(" << v << ") ";
+    cout << "\nBackward iterator: ";
+    for (auto it = listOp.rbegin(); it != listOp.rend(); ++it)
+        cout << "(" << *it << ") ";
+     cout << endl;
+
+    cout << "\nTest circular foreach (2 loops, direccion positiva): " << endl;
+    listOp.circularForEach(2, 1, [](const auto &item){
+        cout << "(" << item << ") ";
+    });
+    cout << "\nTest circular foreach (2 loops, direccion negativa): " << endl;
+    listOp.circularForEach(2, -1, [](const auto &item){
+        cout << "(" << item << ") ";
+    });
+    cout << endl;
 }
 
 
