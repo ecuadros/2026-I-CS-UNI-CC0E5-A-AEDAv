@@ -70,11 +70,6 @@ void BinaryTreeDemo() {
     for (auto it = t.post_rbegin();it != t.post_rend();++it) cout << *it << " ";
     cout << endl;
 
-    cout << "\n5. ForEach (inorder)" << endl;
-    cout << "  ForEach: ";
-    t.ForEach([](T1& v) { cout << v << " "; });
-    cout << endl;
-
     cout << "\n6. BIG FIVE: COPY Y MOVE CONSTRUCTORS" << endl;
     BinaryTree<AscendingBTTrait<T1>> copied(t);
     cout << "  Copia  (Copy Ctor): " << copied << endl;

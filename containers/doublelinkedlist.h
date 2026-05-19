@@ -210,39 +210,14 @@ public:
         }
     }
 
-    friend ostream& operator<<(ostream& os, const DoubleLinkedList& list) {
+    // Reutilizacion operator<< / >>
+    friend ostream& operator<<(ostream& os, DoubleLinkedList& list) {
         shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "[";
-        Node* pCurr = list.m_pRoot;
-        while (pCurr) {
-            os << "(" << pCurr->getData() << "," << pCurr->getRef() << ")";
-            if (pCurr->getNext()) os << ",";
-            pCurr = pCurr->getNext();
-        }
-        os << "]";
-        return os;
+        return container_write(os, list);
     }
 
     friend istream& operator>>(istream& is, DoubleLinkedList& list) {
-        char ch;
-        if (!(is >> ch) || ch != '[') {
-            is.clear(ios_base::failbit);
-            return is;
-        }
-        value_type val;
-        Ref ref;
-        char comma, parentClose;
-        while (is >> ch && ch != ']') {
-            if (ch == '(') {
-                if (is >> val >> comma >> ref >> parentClose) {
-                    if (comma == ',' && parentClose == ')') {
-                        list.insert(val, ref);
-                    }
-                }
-            }
-        }
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
-        return is;
+        return container_read(is, list);
     }
 };
 

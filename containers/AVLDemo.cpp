@@ -7,13 +7,13 @@
 
 using namespace std;
 
-// ToDO comparar la altura de BST vs AVL para una insercion patologica (orden creciente)
+// ToDO comparar la altura de BST vs AVL para una insercion (orden creciente)
 void AVLDemo() {
     cout << "==========================================================" << endl;
     cout << "                     DEMO: AVL TREE                       " << endl;
     cout << "==========================================================" << endl;
 
-    cout << "\n1. INSERCION BALANCEADA (caso patologico: ordenado)" << endl;
+    cout << "\n1. INSERCION BALANCEADA (ordenado)" << endl;
     BinaryTree<AscendingBTTrait<T1>> bst;
     AVL<AscendingAVLTrait<T1>>       avl;
     for (T1 v : {1, 2, 3, 4, 5, 6, 7}) {

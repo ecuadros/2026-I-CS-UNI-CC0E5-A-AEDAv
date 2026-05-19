@@ -3,12 +3,21 @@
 
 #include "linkedlist.h"
 
+// ToDo Reutilizacion Node en CLL
+template <typename T> using CLLNode = LLNode<T>;
+
+template <typename T>
+struct AscendingCLLTrait  : BaseTrait<T, less<T>,    LLNode<T>> {};
+template <typename T>
+struct DescendingCLLTrait : BaseTrait<T, greater<T>, LLNode<T>> {};
+
+// Reutilizacion Iterator
 template <typename Container>
-class CircularForwardIterator : public general_iterator<Container, CircularForwardIterator<Container>> {
+class CircularForwardIterator : public LinkedListForwardIterator<Container> {
     bool m_isEnd = false;
 public:
     using MySelf = CircularForwardIterator<Container>;
-    using Parent = general_iterator<Container, MySelf>;
+    using Parent = LinkedListForwardIterator<Container>;
 
     CircularForwardIterator(Container* pContainer, typename Container::Node* pNode, bool isEnd = false)
         : Parent(pContainer, pNode), m_isEnd(isEnd) {}
@@ -71,20 +80,9 @@ public:
         return *this;
     }
 
-    ~CircularLinkedList() override { clear(); }
-
-    void clear() {
-        unique_lock<shared_mutex> lock(this->m_mtx);
-        if (!this->m_pRoot) return;
-
-        Node* pCurr = this->m_pRoot;
-        for (size_t i = 0; i < this->m_size; ++i) {
-            Node* pNext = pCurr->getNext();
-            delete pCurr;
-            pCurr = pNext;
-        }
-        this->m_pRoot = this->m_tail = nullptr;
-        this->m_size = 0;
+    // Reutilizacion destructor:
+    ~CircularLinkedList() override {
+        if (this->m_tail) this->m_tail->setNext(nullptr); // rompemos el circulo
     }
 
     iterator begin() { return iterator(this, this->m_pRoot, this->m_size == 0); }
@@ -118,28 +116,12 @@ public:
         this->m_size++;
     }
 
-private:
-    void internal_insert(Node* pCurr, Node* pPrev, const value_type& value, Ref ref) {
-        if (pCurr == this->m_pRoot || this->m_comp(value, pCurr->getDataRef())) {
-            Node* newNode = new Node(value, ref, pCurr);
-            pPrev->setNext(newNode);
-            if (pCurr == this->m_pRoot) this->m_tail = newNode;
-            this->m_size++;
-            return;
-        }
-        internal_insert(pCurr->getNext(), pCurr, value, ref);
-    }
-
-public:
+    // Reutilizacion insert: usa internal_insert de LinkedList
     void insert(const value_type& value, Ref ref) override {
         unique_lock<shared_mutex> lock(this->m_mtx);
-        if (!this->m_pRoot || this->m_comp(value, this->m_pRoot->getDataRef())) {
-            lock.unlock(); // evitamos deadlock al llamar a push_front
-            push_front(value, ref);
-            return;
-        }
-
-        internal_insert(this->m_pRoot->getNext(), this->m_pRoot, value, ref);
+        if (this->m_tail) this->m_tail->setNext(nullptr);
+        this->internal_insert(this->m_pRoot, value, ref);
+        if (this->m_tail) this->m_tail->setNext(this->m_pRoot); // Cierra el circulo
     }
 
     tuple<value_type, Ref> pop_front() override {
@@ -204,17 +186,14 @@ public:
         }
     }
 
+    // Reutilizacion operator<< / >>
     friend ostream& operator<<(ostream& os, CircularLinkedList& list) {
         shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "[";
-        Node* act = list.m_pRoot;
-        for (size_t i = 0; i < list.m_size; ++i) {
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            if (i < list.m_size - 1) os << ",";
-            act = act->getNext();
-        }
-        os << "]";
-        return os;
+        return container_write(os, list);
+    }
+
+    friend istream& operator>>(istream& is, CircularLinkedList& list) {
+        return container_read(is, list);
     }
 };
 

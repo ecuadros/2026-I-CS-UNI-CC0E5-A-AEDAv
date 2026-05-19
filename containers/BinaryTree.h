@@ -17,6 +17,7 @@
 
 #include "general_iterator.h"
 #include "traits.h"
+#include "util.h"
 #include "../types.h"
 
 using namespace std;
@@ -373,60 +374,19 @@ public:
         return oss.str();
     }
 
-    // ToDo usar en un bucle nativo foreach
-    template <typename Func, typename... Args>
-    void ForEach(Func func, Args&&... args) {
-        shared_lock<shared_mutex> lock(m_mtx);
-        stack<Node*> st;
-        Node* n = m_pRoot;
-        while (n || !st.empty()) {
-            while (n) { st.push(n); n = n->m_pChild[0]; }
-            n = st.top(); st.pop();
-            func(n->m_data, forward<Args>(args)...);
-            n = n->m_pChild[1];
-        }
-    }
-
     void print2D(ostream& os = cout) const {
         shared_lock<shared_mutex> lock(m_mtx);
         print2D_r(os, m_pRoot, 0);
     }
 
-    // ToDo operator<< (incluye persistencia a archivos)
-    friend ostream& operator<<(ostream& os, const BinaryTree& t) {
+    // Reutilizacion operator<< / >>
+    friend ostream& operator<<(ostream& os, BinaryTree& t) {
         shared_lock<shared_mutex> lock(t.m_mtx);
-        os << "[";
-        bool first = true;
-        stack<Node*> st;
-        Node* n = t.m_pRoot;
-        while (n || !st.empty()) {
-            while (n) { st.push(n); n = n->m_pChild[0]; }
-            n = st.top(); st.pop();
-            if (!first) os << ",";
-            os << "(" << n->m_data << "," << n->m_ref << ")";
-            first = false;
-            n = n->m_pChild[1];
-        }
-        os << "]";
-        return os;
+        return container_write(os, t);
     }
 
-    // ToDo operator>>
     friend istream& operator>>(istream& is, BinaryTree& t) {
-        char ch;
-        if (!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val;
-        Ref ref;
-        char comma, parenClose;
-        while (is >> ch && ch != ']') {
-            if (ch == '(') {
-                if (is >> val >> comma >> ref >> parenClose)
-                    if (comma == ',' && parenClose == ')')
-                        t.insert(val, ref);
-            }
-        }
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
-        return is;
+        return container_read(is, t);
     }
 };
 

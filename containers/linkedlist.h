@@ -58,7 +58,6 @@ public:
     void   setNext(Node *next) { m_next = next; }
 };
 
-// Traits de Ordenamiento
 template <typename T>
 struct AscendingLinkedListTrait{
     using value_type = T;
@@ -73,7 +72,6 @@ struct DescendingLinkedListTrait{
     using Comp = greater<T>;
 };
 
-// Contenedor Principal LinkedList
 template <typename Trait>
 class LinkedList{
 public:
@@ -92,7 +90,8 @@ protected:
     Comp   m_comp;
     mutable shared_mutex m_mtx;
 
-private:
+protected:
+    // Reutilizacion insert
     void internal_insert(Node* &pPrev, const value_type &value, Ref ref);
 
 public:
@@ -175,43 +174,18 @@ public:
         }
     }
 
-    // Operadores I/O
-    friend ostream& operator<<(ostream& os, const LinkedList& list) {
-        shared_lock<shared_mutex>lock(list.m_mtx);
-        os << "[";
-        Node* act = list.m_pRoot;
-        while(act){
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            if(act->getNext()) os << ",";
-            act = act->getNext();
-        }
-        os << "]";
-        return os;
+    // Reutilizacion operator<< / >>
+    friend ostream& operator<<(ostream& os, LinkedList& list) {
+        shared_lock<shared_mutex> lock(list.m_mtx);
+        return container_write(os, list);
     }
 
     friend istream& operator>>(istream& is, LinkedList& list) {
-        char ch;
-        if (!(is >> ch) || ch != '[') {
-            is.clear(ios_base::failbit);
-            return is;
-        }
-        value_type val;
-        Ref ref;
-        char comma, parenClose;
-        while (is >> ch && ch != ']') {
-            if (ch == '(') {
-                if (is >> val >> comma >> ref >> parenClose) {
-                    if (comma == ',' && parenClose == ')') {
-                        list.push_back(val, ref);
-                    }
-                }
-            }
-        }
-        return is;
+        return container_read(is, list);
     }
 };
 
-// Implementacion de Metodos de Lista
+
 template <typename Trait>
 void LinkedList<Trait>::internal_insert(Node* &pPrev, const value_type &value, Ref ref){
     if(!pPrev || m_comp(value, pPrev->getDataRef())){
@@ -266,7 +240,7 @@ void LinkedList<Trait>::push_back(value_type value, Ref ref) {
     m_size++;
 }
 
-// pop_front: Retornar par de datos (Data y Ref) de la cabeza y eliminar el nodo
+// pop_front
 template <typename Trait>
 std::tuple<typename LinkedList<Trait>::value_type, Ref> LinkedList<Trait>::pop_front() {
     unique_lock<shared_mutex> lock(m_mtx);
@@ -283,7 +257,7 @@ std::tuple<typename LinkedList<Trait>::value_type, Ref> LinkedList<Trait>::pop_f
     return result;
 }
 
-// pop_back: Retornar par de datos (Data y Ref) del final y eliminar el nodo
+// pop_back
 template <typename Trait>
 std::tuple<typename LinkedList<Trait>::value_type, Ref> LinkedList<Trait>::pop_back() {
     unique_lock<shared_mutex> lock(m_mtx);

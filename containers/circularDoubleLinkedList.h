@@ -3,12 +3,13 @@
 
 #include "doublelinkedlist.h"
 
+// Reutilizacion Iterator
 template <typename Container>
-class CircularDLLForwardIterator : public general_iterator<Container, CircularDLLForwardIterator<Container>> {
+class CircularDLLForwardIterator : public DLLForwardIterator<Container> {
     bool m_isEnd = false;
 public:
     using MySelf = CircularDLLForwardIterator<Container>;
-    using Parent = general_iterator<Container, MySelf>;
+    using Parent = DLLForwardIterator<Container>;
 
     CircularDLLForwardIterator(Container* pContainer, typename Container::Node* pNode, bool isEnd = false)
         : Parent(pContainer, pNode), m_isEnd(isEnd) {}
@@ -30,12 +31,13 @@ public:
     }
 };
 
+// Reutilizacion Iterator
 template <typename Container>
-class CircularDLLBackwardIterator : public general_iterator<Container, CircularDLLBackwardIterator<Container>> {
+class CircularDLLBackwardIterator : public DLLBackwardIterator<Container> {
     bool m_isEnd = false;
 public:
     using MySelf = CircularDLLBackwardIterator<Container>;
-    using Parent = general_iterator<Container, MySelf>;
+    using Parent = DLLBackwardIterator<Container>;
 
     CircularDLLBackwardIterator(Container* pContainer, typename Container::Node* pNode, bool isEnd = false)
         : Parent(pContainer, pNode), m_isEnd(isEnd) {}
@@ -100,7 +102,14 @@ public:
         return *this;
     }
 
-    ~CircularDoubleLinkedList() override { clear(); }
+    // Reutilizacion destructor
+    ~CircularDoubleLinkedList() override {
+        if (this->m_tail && this->m_pRoot) {
+            // rompemos el circulo
+            this->m_tail->setNext(nullptr);
+            this->m_pRoot->setPrev(nullptr);
+        }
+    }
 
     Node* getRoot() const { return this->m_pRoot; }
     Node* getTail() const { return this->m_tail; }
@@ -247,17 +256,14 @@ public:
         }
     }
 
+    // Reutilizacion operator<< / >>
     friend ostream& operator<<(ostream& os, CircularDoubleLinkedList& list) {
         shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "[";
-        Node* pCurr = list.m_pRoot;
-        for (size_t i = 0; i < list.m_size; ++i) {
-            os << "(" << pCurr->getData() << "," << pCurr->getRef() << ")";
-            if (i < list.m_size - 1) os << ",";
-            pCurr = pCurr->getNext();
-        }
-        os << "]";
-        return os;
+        return container_write(os, list);
+    }
+
+    friend istream& operator>>(istream& is, CircularDoubleLinkedList& list) {
+        return container_read(is, list);
     }
 };
 
