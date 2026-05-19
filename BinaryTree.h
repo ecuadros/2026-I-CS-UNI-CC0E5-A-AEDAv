@@ -1,7 +1,6 @@
 #ifndef __BINARYTREE_H__
 #define __BINARYTREE_H__
 
-// Error #3
 #include <algorithm>
 #include <cstddef>
 #include <fstream>
@@ -117,7 +116,7 @@ public:
     using value_type = typename Trait::value_type;
     using Node = typename Trait::Node;
 
-    // Error #2
+    // error 2
     using Comp = typename Trait::Comp;
     using Compare = typename Trait::Compare;
     using MySelf = BinaryTree<Trait>;
@@ -398,7 +397,7 @@ public:
         clear_unlocked();
     }
 
-    // Error #1
+    // error 1
     void insert(const value_type &data){
         insert(data, Ref());
     }
@@ -573,7 +572,7 @@ public:
         return os;
     }
 
-    // (incluye persistencia a archivo/s)
+    //  persistencia a archivos
     void save(const std::string &filename) const{
         std::shared_lock<std::shared_mutex> lock(m_mtx);
         std::ofstream output(filename);

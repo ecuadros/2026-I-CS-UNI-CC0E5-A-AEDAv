@@ -58,7 +58,7 @@ public:
 
     DoubleLinkedList() {}
 
-    // copy y move para DoubleLinkedList
+    // copy y move 
     DoubleLinkedList(const DoubleLinkedList &other) : Parent() {
         shared_lock<shared_mutex> lock(other.m_mtx);
         this->m_comp = other.m_comp;
@@ -109,7 +109,7 @@ public:
     backward_iterator rbegin(){ return backward_iterator(this, this->m_tail); }
     backward_iterator rend(){ return backward_iterator(this, nullptr); }
 
-    // adaptacion insercion en DoubleLinkedList
+    // adaptacion insercion 
     void insert(const value_type &value, Ref ref) override{
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node *prev = nullptr;
