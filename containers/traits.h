@@ -1,19 +1,11 @@
 #ifndef __TRAITS_H__
 #define __TRAITS_H__
-#include <functional> // para less y greater
 
-template <typename _Node, typename _Comp>
+template <typename T, typename _Comp, typename NodeType>
 struct BaseTrait{
-    using Node       = _Node;
-    using value_type = typename _Node::value_type;
-    using Comp       = _Comp;
-};
-
-template <typename _Node>
-struct AscendingTrait : public BaseTrait<_Node, less<typename _Node::value_type>>{
-};
-template <typename _Node>
-struct DescendingTrait : public BaseTrait<_Node, greater<typename _Node::value_type>>{
+    using value_type = T;
+    using Comp = _Comp;
+    using Node = NodeType;
 };
 
 #endif // __TRAITS_H__
