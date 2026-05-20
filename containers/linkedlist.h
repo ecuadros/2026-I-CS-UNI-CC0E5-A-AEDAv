@@ -32,6 +32,22 @@ public:
     }
 };
 
+// Iterador Backward (solo listas con getPrev: DLL, CDLL)
+template <typename Container>
+class LinkedListBackwardIterator : public general_iterator<Container, LinkedListBackwardIterator<Container>>{
+public:
+    using MySelf = LinkedListBackwardIterator<Container>;
+    using Parent = general_iterator<Container, MySelf>;
+    using Parent::Parent;
+
+    MySelf operator++() {
+        if (this->m_pNode) {
+            this->m_pNode = this->m_pNode->getPrev();
+        }
+        return *this;
+    }
+};
+
 // Linked List Node
 template <typename T, typename NodeType = void>
 class LLNode{
@@ -42,6 +58,7 @@ private:
     Ref m_ref;
     Node *m_next;
 public:
+    using value_type = T;
     LLNode() : m_data(T()), m_ref(Ref()), m_next(nullptr) {}
     LLNode(T data, Ref ref) : m_data(data), m_ref(ref), m_next(nullptr) {}
     LLNode(T data, Ref ref, Node *next) : m_data(data), m_ref(ref), m_next(next) {}
@@ -59,15 +76,13 @@ public:
 
 // Traits de Ordenamiento
 template <typename T>
-struct AscendingLinkedListTrait : BaseTrait<T, less<T>>{
-    using Node = LLNode<T>;
+struct AscendingLinkedListTrait  : public BaseTrait<LLNode<T>, less<T>>{
 };
-
 
 template <typename T>
-struct DescendingLinkedListTrait : BaseTrait<T, greater<T>>{
-    using Node = LLNode<T>;
+struct DescendingLinkedListTrait : public BaseTrait<LLNode<T>, greater<T>>{
 };
+
 
 // Contenedor Principal LinkedList
 template <typename Trait>
@@ -173,14 +188,9 @@ public:
 
     // Operadores I/O
     friend ostream& operator<<(ostream& os, const LinkedList& list) {
-        shared_lock<shared_mutex>lock(list.m_mtx); 
+        shared_lock<shared_mutex> lock(list.m_mtx);
         os << "[";
-        Node* act = list.m_pRoot;
-        while(act){
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            if(act->getNext()) os << ",";
-            act = act->getNext();
-        }
+        list.do_print(os); 
         os << "]";
         return os;
     }
@@ -198,12 +208,22 @@ public:
             if (ch == '(') {
                 if (is >> val >> comma >> ref >> parenClose) {
                     if (comma == ',' && parenClose == ')') {
-                        list.push_back(val, ref);
+                        list.push_back(val, ref);  // virtual → llama al push_back correcto
                     }
                 }
             }
         }
         return is;
+    }
+
+protected:
+    virtual void do_print(ostream& os) const {
+        Node* act = m_pRoot;
+        while (act) {
+            os << "(" << act->getData() << "," << act->getRef() << ")";
+            if (act->getNext()) os << ",";
+            act = act->getNext();
+        }
     }
 };
 

@@ -2,64 +2,19 @@
 #define __CIRCULARDOUBLELINKEDLIST_H__
  
 #include "doublelinkedlist.h"
- 
-// ------------ CDLLNode —------------------
-template <typename T>
-class CDLLNode : public LLNode<T, CDLLNode<T>>{   // hereda LLNode con CDLLNode como NodeType
-    using Node = CDLLNode<T>;                    
-private:
-    Node *m_pPrev;                              
-public:
-    CDLLNode() : LLNode<T, CDLLNode<T>>(), m_pPrev(nullptr) {}
-    CDLLNode(T data, Ref ref, Node *next = nullptr, Node *prev = nullptr)
-        : LLNode<T, CDLLNode<T>>(data, ref, next), m_pPrev(prev) {}
-    virtual ~CDLLNode() {}
 
-    Node*  getPrev() const     { return m_pPrev; }
-    void   setPrev(Node *prev) { m_pPrev = prev; }
-    Node*& getPrevRef()        { return m_pPrev; }
-};
- 
-//  ------------ Traits ----------------
+
+// Traits de Ordenamiento
 template <typename T>
-struct AscendingCDLLTrait : BaseTrait<T, less<T>>{
-    using Node = CDLLNode<T>;
+struct AscendingCDLLTrait  : BaseTrait<DLLNode<T>, less<T>>{
 };
- 
+
 template <typename T>
-struct DescendingCDLLTrait : BaseTrait<T, greater<T>>{
-    using Node = CDLLNode<T>;
+struct DescendingCDLLTrait : BaseTrait<DLLNode<T>, greater<T>>{
 };
+
  
-// ----------- Forward Iterator ------------
-template <typename Container>
-class CDLLForwardIterator : public general_iterator<Container, CDLLForwardIterator<Container>>{
-public:
-    using MySelf = CDLLForwardIterator<Container>;
-    using Parent = general_iterator<Container, MySelf>;
-    using Parent::Parent;
- 
-    MySelf operator++(){
-        if (this->m_pNode) this->m_pNode = this->m_pNode->getNext();
-        return *this;
-    }
-};
- 
-// ------------- Backward Iterator ------------
-template <typename Container>
-class CDLLBackwardIterator : public general_iterator<Container, CDLLBackwardIterator<Container>>{
-public:
-    using MySelf = CDLLBackwardIterator<Container>;
-    using Parent = general_iterator<Container, MySelf>;
-    using Parent::Parent;
- 
-    MySelf operator++(){
-        if (this->m_pNode) this->m_pNode = this->m_pNode->getPrev();
-        return *this;
-    }
-};
- 
-// --------------- CircularDoubleLinkedList --------------
+// CircularDoubleLinkedList
 template <typename Trait>
 class CircularDoubleLinkedList : public DoubleLinkedList<Trait>{
 public:
@@ -67,8 +22,8 @@ public:
     using Node              = typename Trait::Node;
     using Comp              = typename Trait::Comp;
     using MySelf            = CircularDoubleLinkedList<Trait>;
-    using forward_iterator  = CDLLForwardIterator <MySelf>;
-    using backward_iterator = CDLLBackwardIterator<MySelf>;
+    using forward_iterator  = LinkedListForwardIterator <MySelf>;
+    using backward_iterator = LinkedListBackwardIterator<MySelf>;
     friend forward_iterator;
     friend backward_iterator;
  
@@ -77,7 +32,7 @@ public:
     backward_iterator rbegin() { return backward_iterator(this, static_cast<Node*>(this->m_tail));  }
     backward_iterator rend()   { return backward_iterator(this, static_cast<Node*>(this->m_tail));  }
  
-    // ------- Constructores -------
+    // Constructores
     CircularDoubleLinkedList() : DoubleLinkedList<Trait>() {}
  
     CircularDoubleLinkedList(const CircularDoubleLinkedList &other) : DoubleLinkedList<Trait>() {
@@ -132,7 +87,7 @@ public:
         this->m_size  = 0;
     }
  
-    // ---- push_back ----
+    // push_back
     void push_back(value_type value, Ref ref) override {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node* newNode = new Node(value, ref);
@@ -153,7 +108,7 @@ public:
         this->m_size++;
     }
  
-    // ------- front --------
+    // front
     void push_front(value_type value, Ref ref) override {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node* newNode = new Node(value, ref);
@@ -174,7 +129,7 @@ public:
         this->m_size++;
     }
  
-    // ------- inserta de manera ordenada ------- 
+    // inserta de manera ordenada 
     void insert(const value_type &value, Ref ref) override {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node* newNode = new Node(value, ref);
@@ -211,7 +166,7 @@ public:
         this->m_size++;
     }
  
-    // ---- ForEach: Se usa m_size como contador ----
+    // ForEach: Se usa m_size como contador
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&... args) {
         unique_lock<shared_mutex> lock(this->m_mtx);
@@ -221,7 +176,7 @@ public:
             func(act->getDataRef(), std::forward<Args>(args)...);
     }
  
-    // ---- ReverseForEach: desde m_tail hacia atrás ----
+    // ReverseForEach: desde m_tail hacia atrás 
     template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args &&... args) {
         unique_lock<shared_mutex> lock(this->m_mtx);
@@ -237,32 +192,25 @@ public:
         shared_lock<shared_mutex> lock(this->m_mtx);
         return this->m_size;
     }
-    
-    // operadores >> <<
-    friend ostream& operator<<(ostream& os, const CircularDoubleLinkedList& list) {
-        shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "[";
-        Node* act = static_cast<Node*>(list.m_pRoot);
-        for (size_t i = 0; i < list.m_size; i++) {
-            if (i > 0) os << ",";
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            act = act->getNext();
-        }
-        os << "]";
-        return os;
+
+    protected:
+    void do_print(ostream& os) const override {
+        if (this->m_size == 0) return;
+        Node* tail = static_cast<Node*>(this->m_tail);
+        Node* root = static_cast<Node*>(this->m_pRoot);
+
+        // romple los ciclos
+        tail->setNext(nullptr); // rompe ciclo next
+        root->setPrev(nullptr); // rompe ciclo prev
+
+        // usa el do_print existente
+        LinkedList<Trait>::do_print(os);
+
+         // restaura
+        tail->setNext(root);
+        root->setPrev(tail);
     }
- 
-    friend istream& operator>>(istream& is, CircularDoubleLinkedList& list) {
-        char ch;
-        if (!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val; Ref ref; char comma, parenClose;
-        while (is >> ch && ch != ']')
-            if (ch == '(')
-                if (is >> val >> comma >> ref >> parenClose)
-                    if (comma == ',' && parenClose == ')')
-                        list.push_back(val, ref);
-        return is;
-    }
+
 };
  
 #endif

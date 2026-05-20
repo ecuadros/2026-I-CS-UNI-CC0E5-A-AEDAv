@@ -302,7 +302,6 @@ void ListsDemo(){
     //TestBasicos();
     //TestConcurrencia();
     //TestOperators();
-    //cout << "\n------------- FIN DE LAS PRUEBAS -------------" << endl;
     DoubleLinkedListDemo();
     CircularLinkedListDemo();
     CircularDoubleLinkedListDemo();
