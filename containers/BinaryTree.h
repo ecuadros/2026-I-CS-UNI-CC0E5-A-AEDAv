@@ -63,50 +63,50 @@ void fill_postorder(Node* n, Stack<Node*>& s) {
     s.push(n);
 }
 
-// ─── BTIteratorBase ──────────────────────────────────────────────────────────
+// ─── TreeIteratorBase ──────────────────────────────────────────────────────────
 template<typename Node>
-class BTIteratorBase {
+class TreeIteratorBase {
 protected:
     Stack<Node*> m_nodes;
     ptrdiff_t    m_index;
 public:
-    BTIteratorBase() : m_index(0) {}
-    BTIteratorBase(Stack<Node*> nodes, ptrdiff_t idx)
+    TreeIteratorBase() : m_index(0) {}
+    TreeIteratorBase(Stack<Node*> nodes, ptrdiff_t idx)
         : m_nodes(move(nodes)), m_index(idx) {}
 
     typename Node::value_type& operator*() {
         return m_nodes[m_index]->getDataRef();
     }
-    bool operator==(const BTIteratorBase& o) const { return m_index == o.m_index; }
-    bool operator!=(const BTIteratorBase& o) const { return m_index != o.m_index; }
+    bool operator==(const TreeIteratorBase& o) const { return m_index == o.m_index; }
+    bool operator!=(const TreeIteratorBase& o) const { return m_index != o.m_index; }
 };
 
-// ─── BTForwardIterator ───────────────────────────────────────────────────────
+// ─── TreeForwardIterator ───────────────────────────────────────────────────────
 template<typename Node>
-class BTForwardIterator : public BTIteratorBase<Node> {
+class TreeForwardIterator : public TreeIteratorBase<Node> {
 public:
-    using BTIteratorBase<Node>::BTIteratorBase;
-    BTForwardIterator& operator++() { ++this->m_index; return *this; }
+    using TreeIteratorBase<Node>::TreeIteratorBase;
+    TreeForwardIterator& operator++() { ++this->m_index; return *this; }
 };
 
-// ─── BTBackwardIterator ──────────────────────────────────────────────────────
+// ─── TreeReverseIterator ──────────────────────────────────────────────────────
 template<typename Node>
-class BTBackwardIterator : public BTIteratorBase<Node> {
+class TreeReverseIterator : public TreeIteratorBase<Node> {
 public:
-    using BTIteratorBase<Node>::BTIteratorBase;
-    BTBackwardIterator& operator++() { --this->m_index; return *this; }
+    using TreeIteratorBase<Node>::TreeIteratorBase;
+    TreeReverseIterator& operator++() { --this->m_index; return *this; }
 };
 
-// ─── TraversalView ───────────────────────────────────────────────────────────
+// ─── TreeSnapshot ───────────────────────────────────────────────────────────
 template<typename Node>
-struct TraversalView {
-    BTForwardIterator<Node>  m_begin, m_end;
-    BTBackwardIterator<Node> m_rbegin, m_rend;
+struct TreeSnapshot {
+    TreeForwardIterator<Node>  m_begin, m_end;
+    TreeReverseIterator<Node> m_rbegin, m_rend;
 
-    BTForwardIterator<Node>  begin()  { return m_begin;  }
-    BTForwardIterator<Node>  end()    { return m_end;    }
-    BTBackwardIterator<Node> rbegin() { return m_rbegin; }
-    BTBackwardIterator<Node> rend()   { return m_rend;   }
+    TreeForwardIterator<Node>  begin()  { return m_begin;  }
+    TreeForwardIterator<Node>  end()    { return m_end;    }
+    TreeReverseIterator<Node> rbegin() { return m_rbegin; }
+    TreeReverseIterator<Node> rend()   { return m_rend;   }
 
     template<typename Func, typename... Args>
     void forEach(Func func, Args&&... args) {
@@ -122,14 +122,14 @@ struct TraversalView {
 };
 
 template<typename Node>
-TraversalView<Node> make_view(Stack<Node*> s) {
+TreeSnapshot<Node> make_view(Stack<Node*> s) {
     size_t n = s.size();
     Stack<Node*> s2 = s;
-    TraversalView<Node> v;
-    v.m_begin  = BTForwardIterator<Node> (move(s),  0);
-    v.m_end    = BTForwardIterator<Node> ({},        (ptrdiff_t)n);
-    v.m_rbegin = BTBackwardIterator<Node>(move(s2), (ptrdiff_t)n - 1);
-    v.m_rend   = BTBackwardIterator<Node>({},        -1);
+    TreeSnapshot<Node> v;
+    v.m_begin  = TreeForwardIterator<Node> (move(s),  0);
+    v.m_end    = TreeForwardIterator<Node> ({},        (ptrdiff_t)n);
+    v.m_rbegin = TreeReverseIterator<Node>(move(s2), (ptrdiff_t)n - 1);
+    v.m_rend   = TreeReverseIterator<Node>({},        -1);
     return v;
 }
 
@@ -203,29 +203,29 @@ public:
     }
 
     // Traversals con shared_lock — devuelven snapshot del árbol
-    TraversalView<Node> inorder() {
+    TreeSnapshot<Node> inorder() {
         shared_lock<shared_mutex> lock(m_mtx);
         Stack<Node*> s; fill_inorder(m_pRoot, s);
         return make_view(move(s));
     }
 
-    TraversalView<Node> preorder() {
+    TreeSnapshot<Node> preorder() {
         shared_lock<shared_mutex> lock(m_mtx);
         Stack<Node*> s; fill_preorder(m_pRoot, s);
         return make_view(move(s));
     }
 
-    TraversalView<Node> postorder() {
+    TreeSnapshot<Node> postorder() {
         shared_lock<shared_mutex> lock(m_mtx);
         Stack<Node*> s; fill_postorder(m_pRoot, s);
         return make_view(move(s));
     }
 
     // begin/end delegan a inorder -> range-based for usa inorder por defecto
-    BTForwardIterator<Node>  begin()  { return inorder().m_begin;  }
-    BTForwardIterator<Node>  end()    { return inorder().m_end;    }
-    BTBackwardIterator<Node> rbegin() { return inorder().m_rbegin; }
-    BTBackwardIterator<Node> rend()   { return inorder().m_rend;   }
+    TreeForwardIterator<Node>  begin()  { return inorder().m_begin;  }
+    TreeForwardIterator<Node>  end()    { return inorder().m_end;    }
+    TreeReverseIterator<Node> rbegin() { return inorder().m_rbegin; }
+    TreeReverseIterator<Node> rend()   { return inorder().m_rend;   }
 
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
