@@ -40,24 +40,14 @@ private:
         n->m_height = 1 + max(height(n->m_pChild[0]), height(n->m_pChild[1]));
     }
 
-    // Promueve hijo izquierdo (m_pChild[1]) — caso LL
-    void rotate_right(Node*& n) {
-        Node* L        = n->m_pChild[1];
-        n->m_pChild[1] = L->m_pChild[0];
-        L->m_pChild[0] = n;
+    void rotate(Node*& n, size_t dir) {
+        size_t other           = 1 - dir;
+        Node* child            = n->m_pChild[dir];
+        n->m_pChild[dir]       = child->m_pChild[other];
+        child->m_pChild[other] = n;
         update_height(n);
-        update_height(L);
-        n = L;
-    }
-
-    // Promueve hijo derecho (m_pChild[0]) — caso RR
-    void rotate_left(Node*& n) {
-        Node* R        = n->m_pChild[0];
-        n->m_pChild[0] = R->m_pChild[1];
-        R->m_pChild[1] = n;
-        update_height(n);
-        update_height(R);
-        n = R;
+        update_height(child);
+        n = child;
     }
 
     void rebalance(Node*& n) {
@@ -65,12 +55,12 @@ private:
         ptrdiff_t bf = balance_factor(n);
         if(bf > 1) {                                  // left-heavy
             if(balance_factor(n->m_pChild[1]) < 0)
-                rotate_left(n->m_pChild[1]);          // LR: rotar izq primero
-            rotate_right(n);                          // LL (o LR ya corregido)
+                rotate(n->m_pChild[1], 0);            // LR: rotar izq primero
+            rotate(n, 1);                             // LL (o LR ya corregido)
         } else if(bf < -1) {                          // right-heavy
             if(balance_factor(n->m_pChild[0]) > 0)
-                rotate_right(n->m_pChild[0]);         // RL: rotar der primero
-            rotate_left(n);                           // RR (o RL ya corregido)
+                rotate(n->m_pChild[0], 1);            // RL: rotar der primero
+            rotate(n, 0);                             // RR (o RL ya corregido)
         }
     }
 
