@@ -221,7 +221,7 @@ public:
         return make_view(move(s));
     }
 
-    // begin/end delegan a inorder → range-based for usa inorder por defecto
+    // begin/end delegan a inorder -> range-based for usa inorder por defecto
     BTForwardIterator<Node>  begin()  { return inorder().m_begin;  }
     BTForwardIterator<Node>  end()    { return inorder().m_end;    }
     BTBackwardIterator<Node> rbegin() { return inorder().m_rbegin; }
@@ -257,9 +257,9 @@ public:
     }
 
     // Mejora libre #2: printTree por niveles (BFS)
-    void printTree() const {
+    void printTree(ostream& os) const {
         shared_lock<shared_mutex> lock(m_mtx);
-        if(!m_pRoot) { cout << "(empty)\n"; return; }
+        if(!m_pRoot) { os << "(empty)\n"; return; }
         Vector<Node*> queue;
         queue.push_back(m_pRoot, 0);
         size_t levelStart = 0;
@@ -267,11 +267,11 @@ public:
             size_t levelEnd = queue.size();
             for(size_t i = levelStart; i < levelEnd; ++i) {
                 Node* n = queue.get(i);
-                cout << n->m_data << " ";
+                os << n->m_data << " ";
                 if(n->m_pChild[1]) queue.push_back(n->m_pChild[1], 0);
                 if(n->m_pChild[0]) queue.push_back(n->m_pChild[0], 0);
             }
-            cout << "\n";
+            os << "\n";
             levelStart = levelEnd;
         }
     }

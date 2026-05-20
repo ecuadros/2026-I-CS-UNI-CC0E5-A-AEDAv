@@ -6,7 +6,7 @@ using namespace std;
 // ─── AVLNode (CRTP) ──────────────────────────────────────────────────────────
 template<typename T>
 struct AVLNode : public BinaryTreeNode<T, AVLNode<T>> {
-    int m_height = 1;
+    size_t m_height = 1;
     AVLNode(T data, Ref ref) : BinaryTreeNode<T, AVLNode<T>>(data, ref) {}
 };
 
@@ -24,17 +24,17 @@ public:
     using Node       = typename Trait::Node;
     using BinaryTree<Trait>::BinaryTree;
 
-    // Copy constructor propio: llama al vtable de AVL → internal_copy preserva m_height
+    // Copy constructor propio: llama al vtable de AVL -> internal_copy preserva m_height
     AVL(const AVL& other) : BinaryTree<Trait>() {
         shared_lock<shared_mutex> lock(other.m_mtx);
         internal_copy(this->m_pRoot, other.m_pRoot);
     }
 
 private:
-    int  height(Node* n)        { return n ? n->m_height : 0; }
+    size_t    height(Node* n)        { return n ? n->m_height : 0; }
 
-    // bf = height(left) - height(right)  →  left=m_pChild[1], right=m_pChild[0]
-    int  balance_factor(Node* n) { return height(n->m_pChild[1]) - height(n->m_pChild[0]); }
+    // bf = height(left) - height(right) -> left=m_pChild[1], right=m_pChild[0]
+    ptrdiff_t balance_factor(Node* n) { return (ptrdiff_t)height(n->m_pChild[1]) - (ptrdiff_t)height(n->m_pChild[0]); }
 
     void update_height(Node* n) {
         n->m_height = 1 + max(height(n->m_pChild[0]), height(n->m_pChild[1]));
@@ -62,7 +62,7 @@ private:
 
     void rebalance(Node*& n) {
         update_height(n);
-        int bf = balance_factor(n);
+        ptrdiff_t bf = balance_factor(n);
         if(bf > 1) {                                  // left-heavy
             if(balance_factor(n->m_pChild[1]) < 0)
                 rotate_left(n->m_pChild[1]);          // LR: rotar izq primero
@@ -76,9 +76,7 @@ private:
 
 protected:
     void internal_insert(Node*& pNode, const value_type& data, Ref ref) override {
-        if(!pNode) { pNode = new Node(data, ref); return; }
-        auto branch = !this->m_comp(pNode->m_data, data);
-        internal_insert(pNode->m_pChild[branch], data, ref);
+        BinaryTree<Trait>::internal_insert(pNode, data, ref);
         rebalance(pNode);
     }
 
@@ -91,8 +89,8 @@ protected:
     }
 
 public:
-    int height()  { return this->m_pRoot ? this->m_pRoot->m_height : 0; }
-    int balance() { return this->m_pRoot ? balance_factor(this->m_pRoot) : 0; }
+    size_t    height()  { return this->m_pRoot ? this->m_pRoot->m_height : 0; }
+    ptrdiff_t balance() { return this->m_pRoot ? balance_factor(this->m_pRoot) : 0; }
 };
 
 #endif // __AVL_H__
