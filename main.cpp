@@ -3,11 +3,14 @@
 #include "containers/doublelinkedlist.h"
 #include "containers/circularlinkedlist.h"
 #include "containers/circulardoublelinkedlist.h"
-// g++ -std=c++2b main.cpp containers/vector.cpp -o main
+#include "containers/BinaryTree.h"
+#include "containers/avl.h"
+
 void ListsDemo();
+void TreeDemo();
+
 int main(){
-    // DemoVector();
-    //DemoConcurrentVector();
     ListsDemo();
+    TreeDemo();
     return 0;
 }

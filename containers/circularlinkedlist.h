@@ -188,15 +188,6 @@ public:
     forward_iterator begin() { return forward_iterator(this, this->m_pRoot); }
     forward_iterator end()   { return forward_iterator(this, nullptr, true); }
 
-    // ForEach: usa el iterador circular que para al completar la vuelta
-    template <typename Func, typename... Args>
-    void ForEach(Func func, Args&&... args) {
-        unique_lock<shared_mutex> lock(this->m_mtx);
-        if(this->m_size == 0) return;
-        for(auto& item : *this)
-            func(item, forward<Args>(args)...);
-    }
-
     // Mejora libre: recorre la lista N vueltas completas
     template <typename Func, typename... Args>
     void circularForEach(size_t vueltas, Func func, Args&&... args) {
@@ -208,40 +199,6 @@ public:
             func(act->getDataRef(), forward<Args>(args)...);
             act = act->getNext();
         }
-    }
-
-    // operator<<: do-while circular, muestra ->root al final para confirmar el enlace
-    friend ostream& operator<<(ostream& os, const CircularLinkedList& list) {
-        shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "cll:[";
-        if(list.m_pRoot) {
-            Node* act = list.m_pRoot;
-            do {
-                os << "(" << act->getData() << "," << act->getRef() << ")";
-                act = act->getNext();
-                if(act != list.m_pRoot) os << "->";
-            } while(act != list.m_pRoot);
-            os << "]->root(" << list.m_pRoot->getData() << "," << list.m_pRoot->getRef() << ")";
-        } else {
-            os << "]";
-        }
-        return os;
-    }
-
-    // operator>>
-    friend istream& operator>>(istream& is, CircularLinkedList& list) {
-        char ch;
-        if(!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val;
-        Ref ref;
-        char comma, parenClose;
-        while(is >> ch && ch != ']')
-            if(ch == '(')
-                if(is >> val >> comma >> ref >> parenClose)
-                    if(comma == ',' && parenClose == ')')
-                        list.insert(val, ref);
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
-        return is;
     }
 
 private:

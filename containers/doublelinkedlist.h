@@ -187,57 +187,11 @@ public:
     backward_iterator rend()   { return backward_iterator(this, nullptr); }
 
     template <typename Func, typename... Args>
-    void ForEach(Func func, Args&&... args) {
-        unique_lock<shared_mutex> lock(this->m_mtx);
-        if(this->m_size == 0) return;
-        for(auto& item : *this)
-            func(item, forward<Args>(args)...);
-    }
-
-    template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         if(this->m_size == 0) return;
         for(auto it = rbegin(); it != rend(); ++it)
             func(*it, forward<Args>(args)...);
-    }
-
-    // Mejora libre #2: operator<< bidireccional — muestra recorrido fwd y rev para verificar m_pPrev
-    friend ostream& operator<<(ostream& os, const DoubleLinkedList& list) {
-        shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "fwd:[";
-        Node* act = list.m_pRoot;
-        while(act) {
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            if(act->getNext()) os << "->";
-            act = act->getNext();
-        }
-        os << "] rev:[";
-        act = list.m_tail;
-        while(act) {
-            os << "(" << act->getData() << "," << act->getRef() << ")";
-            if(act->getPrev()) os << "->";
-            act = act->getPrev();
-        }
-        os << "]";
-        return os;
-    }
-
-    friend istream& operator>>(istream& is, DoubleLinkedList& list) {
-        char ch;
-        if(!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val;
-        Ref ref;
-        char comma, parenClose;
-        while(is >> ch && ch != ']') {
-            if(ch == '(') {
-                if(is >> val >> comma >> ref >> parenClose)
-                    if(comma == ',' && parenClose == ')')
-                        list.insert(val, ref);
-            }
-        }
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
-        return is;
     }
 
 private:

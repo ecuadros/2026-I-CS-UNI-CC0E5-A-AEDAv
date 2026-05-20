@@ -131,19 +131,20 @@ public:
         return *this;
     }
     
-    // Destructor Seguro
-    virtual ~LinkedList() {
-        unique_lock<shared_mutex>lock(m_mtx);
+    virtual void clear() {
+        unique_lock<shared_mutex> lock(m_mtx);
         Node* current = m_pRoot;
-        while(current){
+        while(current) {
             Node* next = current->getNext();
             delete current;
             current = next;
         }
         m_pRoot = nullptr;
-        m_tail = nullptr;
-        m_size = 0;
+        m_tail  = nullptr;
+        m_size  = 0;
     }
+
+    virtual ~LinkedList() { clear(); }
 
     // Operaciones
     virtual void    push_front(value_type value, Ref ref);
@@ -158,46 +159,43 @@ public:
     forward_iterator begin() { return forward_iterator(this, m_pRoot); }
     forward_iterator end()   { return forward_iterator(this, nullptr); }
 
-    // ForEach
+    // ForEach: recorrido por contador — seguro para listas lineales y circulares
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        if (m_size == 0) return;
-        for(auto& item : *this) {
-            func(item, std::forward<Args>(args)...);
+        Node* act = m_pRoot;
+        for(size_t i = 0; i < m_size; ++i) {
+            func(act->getDataRef(), std::forward<Args>(args)...);
+            act = act->getNext();
         }
     }
 
-    // Operadores I/O
+    // operator<< con i<m_size: funciona para lineales y circulares sin loop infinito
     friend ostream& operator<<(ostream& os, const LinkedList& list) {
-        shared_lock<shared_mutex>lock(list.m_mtx); 
+        shared_lock<shared_mutex> lock(list.m_mtx);
         os << "[";
         Node* act = list.m_pRoot;
-        while(act){
+        for(size_t i = 0; i < list.m_size; ++i) {
             os << "(" << act->getData() << "," << act->getRef() << ")";
-            if(act->getNext()) os << ",";
+            if(i + 1 < list.m_size) os << ",";
             act = act->getNext();
         }
         os << "]";
         return os;
     }
 
+    // operator>> usa insert() virtual: cada derivada mantiene sus invariantes
     friend istream& operator>>(istream& is, LinkedList& list) {
         char ch;
-        if (!(is >> ch) || ch != '[') {
-            is.clear(ios_base::failbit);
-            return is;
-        }
+        if(!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
         value_type val;
         Ref ref;
         char comma, parenClose;
-        while (is >> ch && ch != ']') {
-            if (ch == '(') {
-                if (is >> val >> comma >> ref >> parenClose) {
-                    if (comma == ',' && parenClose == ')') {
-                        list.push_back(val, ref);
-                    }
-                }
+        while(is >> ch && ch != ']') {
+            if(ch == '(') {
+                if(is >> val >> comma >> ref >> parenClose)
+                    if(comma == ',' && parenClose == ')')
+                        list.insert(val, ref);
             }
         }
         return is;

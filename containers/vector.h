@@ -2,10 +2,12 @@
 #define __VECTOR_H__
 
 #include <iostream>
-#include <cstddef> // size_t
+#include <cstddef>
 #include <string>
 #include <sstream>
-#include <shared_mutex> // shared_mutex
+#include <stdexcept>
+#include <utility>
+#include <shared_mutex>
 #include "general_iterator.h"
 #include "util.h"
 #include <mutex>
@@ -80,8 +82,13 @@ private:
     void    resize();
 public:
     Vector(size_t capacity = 10);
+    Vector(const Vector& other);
+    Vector(Vector&& other) noexcept;
+    Vector& operator=(const Vector& other);
+    Vector& operator=(Vector&& other) noexcept;
     virtual ~Vector();
-    virtual void push_back(value_type value, Ref ref);
+    virtual void   push_back(value_type value, Ref ref);
+    virtual T      get(size_t i) const;
     virtual size_t size() const;
     virtual string toString() const;
 
@@ -113,6 +120,57 @@ Vector<T>::Vector(size_t capacity){
     m_capacity = capacity;
     m_size = 0;
     m_data = new Node[capacity];
+}
+
+template <typename T>
+Vector<T>::Vector(const Vector<T>& other) : m_capacity(0), m_size(0), m_data(nullptr) {
+    shared_lock<shared_mutex> lock(other.m_mtx);
+    m_capacity = other.m_capacity;
+    m_size     = other.m_size;
+    m_data     = new Node[m_capacity];
+    for(size_t i = 0; i < m_size; ++i)
+        m_data[i] = other.m_data[i];
+}
+
+template <typename T>
+Vector<T>::Vector(Vector<T>&& other) noexcept : m_capacity(0), m_size(0), m_data(nullptr) {
+    unique_lock<shared_mutex> lock(other.m_mtx);
+    m_capacity = exchange(other.m_capacity, size_t(0));
+    m_size     = exchange(other.m_size,     size_t(0));
+    m_data     = exchange(other.m_data,     nullptr);
+}
+
+template <typename T>
+Vector<T>& Vector<T>::operator=(const Vector<T>& other) {
+    if(this != &other) {
+        shared_lock<shared_mutex> lock(other.m_mtx);
+        delete[] m_data;
+        m_capacity = other.m_capacity;
+        m_size     = other.m_size;
+        m_data     = new Node[m_capacity];
+        for(size_t i = 0; i < m_size; ++i)
+            m_data[i] = other.m_data[i];
+    }
+    return *this;
+}
+
+template <typename T>
+Vector<T>& Vector<T>::operator=(Vector<T>&& other) noexcept {
+    if(this != &other) {
+        unique_lock<shared_mutex> lock(other.m_mtx);
+        delete[] m_data;
+        m_capacity = exchange(other.m_capacity, size_t(0));
+        m_size     = exchange(other.m_size,     size_t(0));
+        m_data     = exchange(other.m_data,     nullptr);
+    }
+    return *this;
+}
+
+template <typename T>
+T Vector<T>::get(size_t i) const {
+    shared_lock<shared_mutex> lock(m_mtx);
+    if(i >= m_size) throw out_of_range("Vector::get: index out of range");
+    return m_data[i].getData();
 }
 
 template <typename T>

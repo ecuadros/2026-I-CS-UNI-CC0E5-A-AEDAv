@@ -219,14 +219,6 @@ public:
     backward_iterator rend()   { return backward_iterator(this, nullptr, true); }
 
     template <typename Func, typename... Args>
-    void ForEach(Func func, Args&&... args) {
-        unique_lock<shared_mutex> lock(this->m_mtx);
-        if(this->m_size == 0) return;
-        for(auto& item : *this)
-            func(item, forward<Args>(args)...);
-    }
-
-    template <typename Func, typename... Args>
     void ReverseForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         if(this->m_size == 0) return;
@@ -245,47 +237,6 @@ public:
             func(act->getDataRef(), forward<Args>(args)...);
             act = (direction >= 0) ? act->getNext() : act->getPrev();
         }
-    }
-
-    // operator<<: muestra fwd y bwd circular para verificar ambos enlaces
-    friend ostream& operator<<(ostream& os, const CircularDoubleLinkedList& list) {
-        shared_lock<shared_mutex> lock(list.m_mtx);
-        os << "cdll fwd:[";
-        if(list.m_pRoot) {
-            Node* act = list.m_pRoot;
-            do {
-                os << "(" << act->getData() << "," << act->getRef() << ")";
-                act = act->getNext();
-                if(act != list.m_pRoot) os << "->";
-            } while(act != list.m_pRoot);
-            os << "]->root | bwd:[";
-            act = list.m_tail;
-            do {
-                os << "(" << act->getData() << "," << act->getRef() << ")";
-                act = act->getPrev();
-                if(act != list.m_tail) os << "->";
-            } while(act != list.m_tail);
-            os << "]->tail";
-        } else {
-            os << "]";
-        }
-        return os;
-    }
-
-    // operator>>
-    friend istream& operator>>(istream& is, CircularDoubleLinkedList& list) {
-        char ch;
-        if(!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val;
-        Ref ref;
-        char comma, parenClose;
-        while(is >> ch && ch != ']')
-            if(ch == '(')
-                if(is >> val >> comma >> ref >> parenClose)
-                    if(comma == ',' && parenClose == ')')
-                        list.insert(val, ref);
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
-        return is;
     }
 
 private:
