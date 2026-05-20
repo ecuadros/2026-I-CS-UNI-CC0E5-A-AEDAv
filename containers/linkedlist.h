@@ -10,6 +10,7 @@
 #include <shared_mutex> 
 #include <utility>
 #include <tuple>
+#include <type_traits>
 #include "general_iterator.h"
 #include "util.h"
 #include "../types.h"
@@ -33,10 +34,12 @@ public:
 };
 
 // Linked List Node
-template <typename T>
+template <typename T, typename NodeType = void>
 class LLNode{
+public:
+    using value_type = T;
 protected:
-    using Node = NodeType;
+    using Node = conditional_t<is_void_v<NodeType>, LLNode, NodeType>;
 private:
     T   m_data;
     Ref m_ref;
@@ -52,20 +55,17 @@ public:
     void   setData(T data) { m_data = data; }
     Ref    getRef() const  { return m_ref; }
     void   setRef(Ref ref) { m_ref = ref; }
-    Node*  ngetNext() const { return m_next; }
+    Node*  getNext() const { return m_next; }
     Node*& getNextRef()    { return m_next; }
     void   setNext(Node *next) { m_next = next; }
 };
 
 // Traits de Ordenamiento
 template <typename T>
-struct AscendingLinkedListTrait: public BaseTrait<LLNode<T>, less<T>>{
-};
+struct AscendingLinkedListTrait : BaseTrait<LLNode<T>, less<T>> {};
 
 template <typename T>
-struct DescendingLinkedListTrait : public BaseTrait<LLNode<T>, greater<T>>{
-
-};
+struct DescendingLinkedListTrait : BaseTrait<LLNode<T>, greater<T>> {};
 
 // Contenedor Principal LinkedList
 template <typename Trait>
@@ -79,12 +79,13 @@ public:
     using forward_iterator = LinkedListForwardIterator<MySelf>;
     friend forward_iterator;
 
-private:
+protected:
     Node *m_pRoot = nullptr;
     Node *m_tail = nullptr;
     size_t m_size = 0;
     Comp   m_comp;
     mutable shared_mutex m_mtx;
+private:
     void internal_insert(Node* &pPrev, const value_type &value, Ref ref);
 
 public:
