@@ -237,22 +237,15 @@ public:
 
     string toString() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        Stack<Node*> si, sp, spo;
-        fill_inorder  (m_pRoot, si);
-        fill_preorder (m_pRoot, sp);
-        fill_postorder(m_pRoot, spo);
+        Stack<Node*> s;
+        fill_inorder(m_pRoot, s);
         ostringstream oss;
-        auto dump = [](Stack<Node*>& s, ostringstream& o) {
-            o << "[";
-            for(size_t i = 0; i < s.size(); ++i) {
-                if(i) o << ",";
-                o << "(" << s[i]->m_data << "," << s[i]->m_ref << ")";
-            }
-            o << "]";
-        };
-        oss << "inorder:   "; dump(si,  oss); oss << "\n";
-        oss << "preorder:  "; dump(sp,  oss); oss << "\n";
-        oss << "postorder: "; dump(spo, oss);
+        oss << "[";
+        for(size_t i = 0; i < s.size(); ++i) {
+            if(i) oss << ",";
+            oss << "(" << s[i]->m_data << "," << s[i]->m_ref << ")";
+        }
+        oss << "]";
         return oss.str();
     }
 
