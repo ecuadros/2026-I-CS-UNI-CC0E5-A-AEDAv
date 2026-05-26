@@ -6,8 +6,8 @@
 
 // Extender BTNode para AVL con campo de altura
 template<typename T>
-struct AVLNode : public BTNode<T> {
-    using BTNode<T>::BTNode;
+struct AVLNode : public BTNode<T, AVLNode<T>> {
+    using BTNode<T, AVLNode<T>>::BTNode;
     T1 m_height = 1;
 };
 

@@ -12,6 +12,11 @@
 #include "../types.h"
 using namespace std;
 
+template <typename T1, typename T2>
+ostream& operator<<(ostream& os, const std::tuple<T1, T2>& t) {
+    return os << "{" << std::get<0>(t) << ":" << std::get<1>(t) << "}";
+}
+
 template <typename Container>
 class vector_forward_iterator : public general_iterator<Container, vector_forward_iterator<Container>> {
 public:
@@ -106,6 +111,57 @@ public:
             return;
         ::ForEach(rbegin(), rend(), func, std::forward<Args>(args)... );
     }
+
+    Vector(const Vector& other) : m_capacity(other.m_capacity), m_size(other.m_size) {
+        shared_lock<shared_mutex> lock(other.m_mtx);
+        m_data = new Node[m_capacity];
+        for (size_t i = 0; i < m_size; ++i) m_data[i] = other.m_data[i];
+    }
+    
+    Vector(Vector&& other) noexcept : m_capacity(0), m_size(0), m_data(nullptr) {
+        unique_lock<shared_mutex> lock(other.m_mtx);
+        m_capacity = std::exchange(other.m_capacity, 0);
+        m_size = std::exchange(other.m_size, 0);
+        m_data = std::exchange(other.m_data, nullptr);
+    }
+
+    Vector& operator=(const Vector& other) {
+        if (this != &other) {
+            unique_lock<shared_mutex> lock(m_mtx);
+            shared_lock<shared_mutex> olock(other.m_mtx);
+            delete[] m_data;
+            m_capacity = other.m_capacity;
+            m_size = other.m_size;
+            m_data = new Node[m_capacity];
+            for(size_t i = 0; i < m_size; ++i) m_data[i] = other.m_data[i];
+        }
+        return *this;
+    }
+
+    Vector& operator=(Vector&& other) noexcept {
+        if (this != &other) {
+            unique_lock<shared_mutex> lock(m_mtx);
+            unique_lock<shared_mutex> olock(other.m_mtx);
+            delete[] m_data;
+            m_capacity = std::exchange(other.m_capacity, 0);
+            m_size = std::exchange(other.m_size, 0);
+            m_data = std::exchange(other.m_data, nullptr);
+        }
+        return *this;
+    }
+
+    value_type& operator[](size_t index) {
+        shared_lock<shared_mutex> lock(m_mtx);
+        if(index >= m_size) throw out_of_range("Indice fuera de rango");
+        return m_data[index].getDataRef();
+    }
+    
+    value_type operator[](size_t index) const {
+        shared_lock<shared_mutex> lock(m_mtx);
+        if(index >= m_size) throw out_of_range("Indice fuera de rango");
+        return m_data[index].getData();
+    }
+
 };
 
 template <typename T>

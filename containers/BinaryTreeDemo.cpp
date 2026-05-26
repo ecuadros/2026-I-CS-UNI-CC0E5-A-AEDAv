@@ -1,76 +1,58 @@
 #include <iostream>
+#include <string>
 #include "BinaryTree.h"
 #include "traits.h"
-#include "../types.h"
-
 using namespace std;
 
-void DemoBinaryTreeAscending() {
-    cout << "\nBinary Tree - Ascending Order" << endl;
-    
-    BinaryTree<AscendingTrait<BTNode<T1>>> bt;
-    
-    cout << "1. Insertando 7 elementos: 50, 30, 70, 20, 40, 60, 80" << endl;
-    bt.insert(50, 10);
-    bt.insert(30, 20);
-    bt.insert(70, 30);
-    bt.insert(20, 40);
-    bt.insert(40, 50);
-    bt.insert(60, 60);
-    bt.insert(80, 70);
-    cout << "   Tamaño: " << bt.size() << endl;
-    
-    cout << "2. Buscando elemento valor=40:" << endl;
-    try {
-        auto [data, ref] = bt.search(40);
-        cout << "Encontrado: (" << data << ", " << ref << ")" << endl;
-    } catch (const exception& e) {
-        cout << "No encontrado" << endl;
-    }
-    
-    cout << "3. Buscando elemento valor=25:" << endl;
-    try {
-        auto [data, ref] = bt.search(25);
-        cout << "Encontrado: (" << data << ", " << ref << ")" << endl;
-    } catch (const exception& e) {
-        cout << "No encontrado" << endl;
-    }
-    
-    cout << "4. Verificando si esta balanceado:" << endl;
-    if (bt.isBalanced()) {
-        cout << "Árbol esta balanceado" << endl;
-    } else {
-        cout << "Árbol no balanceado" << endl;
-    }
-}
+template <typename Tree, typename Predicate>
+void DemoGenericTree(Tree& tree, const string& name, Predicate dfs_pred, const string& desc_pred) {
+    cout << "\n--- " << name << " ---" << endl;
 
-void DemoBinaryTreeDescending() {
-    cout << "\nBinary Tree - Descending Order" << endl;
+    // 1. Inserción 
+    tree.insert(50, 1);
+    tree.insert(30, 2);
+    tree.insert(70, 3);
+    tree.insert(20, 4);
+    tree.insert(40, 5);
+
+    // 2. Comprobar Balanceo 
+    cout << "Esta balanceado?: " << (tree.isBalanced() ? "Sí" : "No") << endl;
+
+    // 3. Iteradores en Bucle Nativo
+    cout << "Recorrido Inorder (Bucle Nativo): ";
+    for (auto val : tree) { cout << val << " "; }
+    cout << endl;
     
-    BinaryTree<DescendingTrait<BTNode<T1>>> bt;
+    cout << "Recorrido Preorder (Traversal View): ";
+    for (auto val : tree.preorder()) { cout << val << " "; }
+    cout << endl;
+
+    // 4. Busqueda DFS Personalizada
+    cout << "Buscando (DFS) " << desc_pred << ":" << endl;
+    auto resultados = tree.searchAll(dfs_pred);
     
-    cout << "1. Insertando 7 elementos: 50, 30, 70, 20, 40, 60, 80" << endl;
-    bt.insert(50, 10);
-    bt.insert(30, 20);
-    bt.insert(70, 30);
-    bt.insert(20, 40);
-    bt.insert(40, 50);
-    bt.insert(60, 60);
-    bt.insert(80, 70);
-    cout << "   Tamaño: " << bt.size() << endl;
-    
-    cout << "2. Buscando elemento valor=50:" << endl;
-    try {
-        auto [data, ref] = bt.search(50);
-        cout << "   Encontrado: (" << data << ", " << ref << ")" << endl;
-    } catch (const exception& e) {
-        cout << "   No encontrado" << endl;
+    cout << "Resultados: [ ";
+    for (const auto& tupla : resultados) {
+        cout << "(" << std::get<0>(tupla) << "," << std::get<1>(tupla) << ") ";
     }
+    cout << "]" << endl;
 }
 
 void BinaryTreeDemo() {
-    cout << "BINARY TREE DEMO" << endl;
-    DemoBinaryTreeAscending();
-    DemoBinaryTreeDescending();
+    BinaryTree<AscendingTrait<BTNode<T1>>> treeAsc;
+    BinaryTree<DescendingTrait<BTNode<T1>>> treeDesc;
 
+    DemoGenericTree(
+        treeAsc, 
+        "Demo arbol binario - ascendente", 
+        [](const T1& val) { return val > 35; }, 
+        "valores mayores a 35"
+    );
+
+    DemoGenericTree(
+        treeDesc, 
+        "Demo arbol binario - descendente", 
+        [](const T1& val) { return val < 45; }, 
+        "valores menores a 45"
+    );
 }
