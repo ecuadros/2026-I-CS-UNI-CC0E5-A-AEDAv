@@ -40,9 +40,9 @@ public:
 private:
     size_t node_height(Node* n) const { return n ? n->getHeight() : 0; }
 
-    long balance_factor(Node* n) const {
+    Balance balance_factor(Node* n) const {
         if (!n) return 0;
-        return (long)node_height(n->m_pChild[0]) - (long)node_height(n->m_pChild[1]);
+        return (Balance)node_height(n->m_pChild[0]) - (Balance)node_height(n->m_pChild[1]);
     }
 
     void update_height(Node* n) {
@@ -73,7 +73,7 @@ private:
     void balance(Node*& n) {
         if (!n) return;
         update_height(n);
-        long bf = balance_factor(n);
+        Balance bf = balance_factor(n);
         if (bf > 1) {
             if (balance_factor(n->m_pChild[0]) < 0)
                 n->m_pChild[0] = rotateLeft(n->m_pChild[0]);
@@ -99,7 +99,7 @@ public:
         return node_height(this->m_pRoot);
     }
 
-    long balanceFactor() const {
+    Balance balanceFactor() const {
         shared_lock<shared_mutex> lock(this->m_mtx);
         return balance_factor(this->m_pRoot);
     }
