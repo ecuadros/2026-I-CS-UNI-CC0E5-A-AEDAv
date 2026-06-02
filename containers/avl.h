@@ -23,13 +23,12 @@ private:
 
     T1 height(Node* n) const {
         if (!n) return 0;
-        return static_cast<AVLNode<value_type>*>(n)->m_height;
+        return n->m_height;
     }
 
     void update_height(Node* n) {
         if (!n) return;
-        auto avl_n = static_cast<AVLNode<value_type>*>(n);
-        avl_n->m_height = 1 + max(height(n->m_child[0]), height(n->m_child[1]));
+        n->m_height = 1 + std::max(height(n->m_child[0]), height(n->m_child[1]));
     }
 
     T1 balance_factor(Node* n) const {
