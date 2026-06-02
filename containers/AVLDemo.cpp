@@ -26,7 +26,7 @@ void DemoGenericAVL(Tree& tree, const string& name, Predicate dfs_pred, const st
 
     // 3. Iteradores en Bucle Nativo
     cout << "Recorrido Inorder: ";
-    for (auto val : tree) { cout << val << " "; }
+    for (auto val : tree.inorder()) { cout << val << " "; }
     cout << endl;
     
     cout << "Recorrido Preorder: ";

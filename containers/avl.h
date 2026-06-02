@@ -6,8 +6,8 @@
 
 // Extender BTNode para AVL con campo de altura
 template<typename T>
-struct AVLNode : public BTNode<T, AVLNode<T>> {
-    using BTNode<T, AVLNode<T>>::BTNode;
+struct AVLNode : public NodeBase<T, AVLNode<T>> {
+    using NodeBase<T, AVLNode<T>>::NodeBase;
     T1 m_height = 1;
 };
 
@@ -72,7 +72,7 @@ private:
 protected:
     // internal_insert: delega a BinaryTree y luego rebalancea
     void internal_insert(Node* &node, const value_type &data, Ref ref) override {
-        if (!node) { node = new AVLNode<value_type>(data, ref); return; }
+        if (!node) { node = new Node(data, ref); return; }
         auto branch = !this->m_cmp(data, node->m_data);
         internal_insert(node->m_child[branch], data, ref);
         rebalance(node);
@@ -81,10 +81,8 @@ protected:
     // Adaptar
     Node* internal_copy(Node* node) override {
         if (!node) return nullptr;
-        auto* n = new AVLNode<value_type>(node->m_data, node->m_ref);
-        auto* avl_src = static_cast<AVLNode<value_type>*>(node);
-        auto* avl_dst = static_cast<AVLNode<value_type>*>(n);
-        avl_dst->m_height  = avl_src->m_height;
+        Node* n = new Node(node->m_data, node->m_ref);
+        n->m_height = node->m_height;
         n->m_child[0] = internal_copy(node->m_child[0]);
         n->m_child[1] = internal_copy(node->m_child[1]);
         return n;
@@ -92,30 +90,7 @@ protected:
 
 public:
     AVLTree() : BinaryTree<Trait>() {}
-
-    // Copy constructor
-    AVLTree(const AVLTree& other) : BinaryTree<Trait>() {
-        shared_lock<shared_mutex> lock(other.m_lock);
-        this->m_root = internal_copy(other.m_root);
-    }
-
-    // Move constructor
-    AVLTree(AVLTree&& other) : BinaryTree<Trait>(std::move(other)) {}
-
-    AVLTree& operator=(const AVLTree& other) {
-        if (this != &other) {
-            this->clear();
-            shared_lock<shared_mutex> lock(other.m_lock);
-            this->m_root = internal_copy(other.m_root);
-        }
-        return *this;
-    }
-
-    AVLTree& operator=(AVLTree&& other) {
-        BinaryTree<Trait>::operator=(std::move(other));
-        return *this;
-    }
-
+    
     virtual ~AVLTree() {}
 
     // Balance

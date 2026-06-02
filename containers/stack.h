@@ -16,14 +16,13 @@ public:
     // copy constructor
     Stack(const Stack& other) : m_vec(other.m_vec.size() + 64) {
         shared_lock<shared_mutex> lock(other.m_mtx);
-        for (size_t i = 0; i < other.m_vec.size(); ++i)
-            m_vec.push_back(other.m_vec[i], 0);
+        this->m_vec = other.m_vec;
     }
     
     // move constructor
     Stack(Stack&& other) : m_vec(0) {
         unique_lock<shared_mutex> lock(other.m_mtx);
-        m_vec = exchange(other.m_vec, Vector<T>(0));
+        this->m_vec = exchange(other.m_vec, Vector<T>(0));
     }
 
     // copy assignment
@@ -31,9 +30,9 @@ public:
         if (this != &other) {
             unique_lock<shared_mutex> lock(m_mtx);
             shared_lock<shared_mutex> olock(other.m_mtx);
-            m_vec = Vector<T>(other.m_vec.size() + 64);
+            this->m_vec = Vector<T>(other.m_vec.size() + 64);
             for (size_t i = 0; i < other.m_vec.size(); ++i)
-                m_vec.push_back(other.m_vec[i], 0);
+                this->m_vec.push_back(other.m_vec[i], 0);
         }
         return *this;
     }
@@ -43,7 +42,7 @@ public:
         if (this != &other) {
             unique_lock<shared_mutex> lock(m_mtx);
             unique_lock<shared_mutex> olock(other.m_mtx);
-            m_vec = exchange(other.m_vec, Vector<T>(0));
+            this->m_vec = exchange(other.m_vec, Vector<T>(0));
         }
         return *this;
     }
@@ -54,28 +53,28 @@ public:
     // operaciones de stack
     void push(T val) {
         unique_lock<shared_mutex> lock(m_mtx);
-        m_vec.push_back(val, 0);
+        this->m_vec.push_back(val, 0);
     }
 
     void pop() {
         unique_lock<shared_mutex> lock(m_mtx);
-        if (m_vec.size() == 0) throw out_of_range("stack vacio");
-        m_vec.pop_back();
+        if (this->m_vec.size() == 0) throw out_of_range("stack vacio");
+        this->m_vec.pop_back();
     }
 
     T top() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        if (m_vec.size() == 0) throw out_of_range("stack vacio");
-        return m_vec[m_vec.size() - 1];
+        if (this->m_vec.size() == 0) throw out_of_range("stack vacio");
+        return this->m_vec[this->m_vec.size() - 1];
     }
 
     T operator[](size_t i) const {
         shared_lock<shared_mutex> lock(m_mtx);
-        return m_vec[i];
+        return this->m_vec[i];
     }
 
-    bool empty() const { shared_lock<shared_mutex> lock(m_mtx); return m_vec.size() == 0; }
-    size_t size() const { shared_lock<shared_mutex> lock(m_mtx); return m_vec.size(); }
+    bool empty() const { shared_lock<shared_mutex> lock(m_mtx); return this->m_vec.size() == 0; }
+    size_t size() const { shared_lock<shared_mutex> lock(m_mtx); return this->m_vec.size(); }
 };
 
 #endif // __STACK_H__

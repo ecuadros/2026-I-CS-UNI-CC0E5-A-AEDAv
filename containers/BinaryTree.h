@@ -13,33 +13,44 @@
 #include "traits.h"
 using namespace std;
 
-// BTNode
-template<typename T, typename DerivedNode = void>
-struct BTNode {
+template <typename T, typename Derived>
+struct NodeBase {
     using value_type = T;
-    using Node = std::conditional_t<std::is_void_v<DerivedNode>, BTNode, DerivedNode>;
+    
     T m_data;
     Ref m_ref;
-    Node *m_child[2];
-    BTNode(T data, Ref ref) : m_data(data), m_ref(ref), m_child{nullptr, nullptr} {}
+    Derived* m_child[2];
+
+    NodeBase(T data, Ref ref) : m_data(data), m_ref(ref), m_child{nullptr, nullptr} {}
+
+    friend std::ostream& operator<<(std::ostream& os, const NodeBase& node) {
+        os << "(" << node.m_data << "," << node.m_ref << ")";
+        return os;
+    }
+};
+
+// BTNode
+template<typename T>
+struct BTNode : public NodeBase<T, BTNode<T>> {
+    using NodeBase<T, BTNode<T>>::NodeBase;
 };
 
 // BTIteratorBase
 template<typename Node, typename value_type>
 class BTIteratorBase {
 protected:
-    Stack<Node*> m_nodes;
+    const Stack<Node*>* m_nodes_ptr;
     size_t m_pos;
 
 public:
-    BTIteratorBase() : m_pos(0) {}
-    BTIteratorBase(Stack<Node*> s, size_t pos) : m_nodes(s), m_pos(pos) {}
+    BTIteratorBase() : m_nodes_ptr(nullptr), m_pos(0) {}
+    BTIteratorBase(const Stack<Node*>* s_ptr, size_t pos) : m_nodes_ptr(s_ptr), m_pos(pos) {}
 
-    value_type& operator*() const { return m_nodes[m_pos]->m_data; }
-    Node* getNode() const { return m_nodes[m_pos]; }
+    value_type& operator*() const { return (*m_nodes_ptr)[m_pos]->m_data; }
+    Node* getNode() const { return  (*m_nodes_ptr)[m_pos]; }
 
-    bool operator==(const BTIteratorBase& o) const { return m_pos == o.m_pos; }
-    bool operator!=(const BTIteratorBase& o) const { return m_pos != o.m_pos; }
+    bool operator==(const BTIteratorBase& o) const { return m_pos == o.m_pos && m_nodes_ptr == o.m_nodes_ptr; }
+    bool operator!=(const BTIteratorBase& o) const { return !(*this == o); }
 };
 
 // Forward iterator
@@ -58,21 +69,31 @@ public:
     BTBackwardIterator& operator++() { --this->m_pos; return *this; }
 };
 
-template<typename ForwardIt, typename BackwardIt>
+template<typename Node, typename value_type>
 class TraversalView {
-    ForwardIt m_begin;
-    ForwardIt m_end;
-    BackwardIt m_rbegin;
-    BackwardIt m_rend;
+private:
+    Stack<Node*> m_data;
 
 public:
-    TraversalView(ForwardIt b, ForwardIt e, BackwardIt rb, BackwardIt re)
-        : m_begin(b), m_end(e), m_rbegin(rb), m_rend(re) {}
+    using ForwardIt = BTForwardIterator<Node, value_type>;
+    using BackwardIt = BTBackwardIterator<Node, value_type>;
+    TraversalView(Stack<Node*>&& s) : m_data(std::move(s)) {}
 
-    ForwardIt begin() const { return m_begin;  }
-    ForwardIt end() const { return m_end;    }
-    BackwardIt rbegin() const { return m_rbegin; }
-    BackwardIt rend() const { return m_rend;   }
+    ForwardIt begin() const { return ForwardIt(&m_data, 0); }
+    ForwardIt end() const   { return ForwardIt(&m_data, m_data.size()); }
+    BackwardIt rbegin() const { return BackwardIt(&m_data, m_data.size() - 1); }
+    BackwardIt rend() const   { return BackwardIt(&m_data, (size_t)-1); }
+
+    struct ReverseView {
+        Stack<Node*> m_data;
+        ReverseView(Stack<Node*>&& s) : m_data(std::move(s)) {}
+        auto begin() const { return BackwardIt(&m_data, m_data.size() - 1); }
+        auto end() const   { return BackwardIt(&m_data, (size_t)-1); }
+    };
+
+    ReverseView reversed() && {
+        return ReverseView(std::move(this->m_data));
+    }
 
     template<typename Func, typename... Args>
     void forEach(Func func, Args&&... args) const {
@@ -98,9 +119,9 @@ public:
     using ForwardIt = BTForwardIterator <Node, value_type>;
     using BackwardIt = BTBackwardIterator<Node, value_type>;
 
-    using InorderView = TraversalView<ForwardIt, BackwardIt>;
-    using PreorderView = TraversalView<ForwardIt, BackwardIt>;
-    using PostorderView = TraversalView<ForwardIt, BackwardIt>;
+    using InorderView = TraversalView<Node, value_type>;
+    using PreorderView = TraversalView<Node, value_type>;
+    using PostorderView = TraversalView<Node, value_type>;
 
 protected:
     Node *m_root;
@@ -194,20 +215,13 @@ protected:
         s.push(node);
     }
 
-    TraversalView<ForwardIt, BackwardIt> make_view(Stack<Node*> s) const {
-        size_t last = s.size() - 1;
-        ForwardIt  b (s, 0), e (s, s.size());
-        BackwardIt rb(s, last), re(s, (size_t)-1);
-        return { b, e, rb, re };
-    }
-
     // ToString
     string traversalToString(Stack<Node*>& s) const {
         ostringstream oss;
         oss << "[";
         for (size_t i = 0; i < s.size(); ++i) {
-            if (i) oss << ",";
-            oss << "(" << s[i]->m_data << "," << s[i]->m_ref << ")";
+            if (i > 0) oss << ",";
+            oss << *(s[i]);
         }
         oss << "]";
         return oss.str();
@@ -230,18 +244,20 @@ public:
 
     BinaryTree& operator=(const BinaryTree& other) {
         if (this != &other) {
-            clear();
-            shared_lock<shared_mutex> lock(other.m_lock);
-            m_root = internal_copy(other.m_root);
+            unique_lock<shared_mutex> lock(this->m_lock);
+            shared_lock<shared_mutex> olock(other.m_lock);
+            internal_clear(this->m_root);
+            this->m_root = internal_copy(other.m_root);
         }
         return *this;
     }
 
     BinaryTree& operator=(BinaryTree&& other) {
         if (this != &other) {
-            clear();
-            unique_lock<shared_mutex> lock(other.m_lock);
-            m_root = exchange(other.m_root, nullptr);
+            unique_lock<shared_mutex> lock(this->m_lock);
+            unique_lock<shared_mutex> olock(other.m_lock);
+            internal_clear(this->m_root);
+            this->m_root = exchange(other.m_root, nullptr);
         }
         return *this;
     }
@@ -294,7 +310,7 @@ public:
         shared_lock<shared_mutex> lock(m_lock);
         Stack<Node*> stk;
         fill_inorder(m_root, stk);
-        return make_view(stk);
+        return InorderView(std::move(stk));
     }
     
     // Forward/Backward iterator preorder
@@ -302,7 +318,7 @@ public:
         shared_lock<shared_mutex> lock(m_lock);
         Stack<Node*> stk;
         fill_preorder(m_root, stk);
-        return make_view(stk);
+        return PreorderView(std::move(stk));
     }
 
     // Forward/Backward iterator postorder
@@ -310,34 +326,44 @@ public:
         shared_lock<shared_mutex> lock(m_lock);
         Stack<Node*> stk;
         fill_postorder(m_root, stk);
-        return make_view(stk);
+        return PostorderView(std::move(stk));
     }
-
-    ForwardIt begin() const { return inorder().begin(); }
-    ForwardIt end()   const { return inorder().end();   }
 
     // ToString
     string toString() const {
         shared_lock<shared_mutex> lock(m_lock);
-        Stack<Node*> stk;
         string result;
-        fill_inorder(m_root, stk);
-        result += "Inorder:"   + traversalToString(stk) + "\n";
-        while (!stk.empty()) stk.pop();
-        fill_preorder(m_root, stk);
-        result += "Preorder:"  + traversalToString(stk) + "\n";
-        while (!stk.empty()) stk.pop();
-        fill_postorder(m_root, stk);
-        result += "Postorder:" + traversalToString(stk);
+        {
+            Stack<Node*> stk;
+            fill_inorder(m_root, stk);
+            result += "Inorder:" + traversalToString(stk) + "\n";
+        }
+
+        {
+            Stack<Node*> stk;
+            fill_preorder(m_root, stk);
+            result += "Preorder:" + traversalToString(stk) + "\n";
+        }
+        
+        {
+            Stack<Node*> stk;
+            fill_postorder(m_root, stk);
+            result += "Postorder:" + traversalToString(stk);
+        }
         return result;
     }
 
     // operator<<
     friend ostream& operator<<(ostream& os, const BinaryTree& tree) {
-        shared_lock<shared_mutex> lock(tree.m_lock);
-        Stack<Node*> stk;
-        tree.fill_inorder(tree.m_root, stk);
-        os << tree.traversalToString(stk);
+        os << "[";
+        bool first = true;
+        auto view = tree.inorder(); 
+        for (auto it = view.begin(); it != view.end(); ++it) {
+            if (!first) os << ",";
+            os << *(it.getNode()); 
+            first = false;
+        }
+        os << "]";
         return os;
     }
 

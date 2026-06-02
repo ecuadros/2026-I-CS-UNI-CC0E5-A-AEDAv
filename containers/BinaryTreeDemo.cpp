@@ -19,12 +19,28 @@ void DemoGenericTree(Tree& tree, const string& name, Predicate dfs_pred, const s
     cout << "Esta balanceado?: " << (tree.isBalanced() ? "Sí" : "No") << endl;
 
     // 3. Iteradores en Bucle Nativo
-    cout << "Recorrido Inorder (Bucle Nativo): ";
-    for (auto val : tree) { cout << val << " "; }
+    cout << "Recorrido Inorder (Forward): ";
+    for (auto val : tree.inorder()) { cout << val << " "; }
     cout << endl;
     
-    cout << "Recorrido Preorder (Traversal View): ";
+    cout << "Recorrido Inorder (Backward): ";
+    for (auto val : tree.inorder().reversed()) cout << val << " ";
+    cout << endl;
+
+    cout << "Recorrido Preorder (Forward): ";
     for (auto val : tree.preorder()) { cout << val << " "; }
+    cout << endl;
+
+    cout << "Recorrido Preorder (Backward): ";
+    for (auto val : tree.preorder().reversed()) cout << val << " ";
+    cout << endl;
+
+    cout << "Recorrido Postorder (Forward): ";
+    for (auto val : tree.postorder()) { cout << val << " "; }
+    cout << endl;
+
+    cout << "Recorrido Postorder (Backward): ";
+    for (auto val : tree.postorder().reversed()) cout << val << " ";
     cout << endl;
 
     // 4. Busqueda DFS Personalizada
