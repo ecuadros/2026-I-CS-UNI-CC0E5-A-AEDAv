@@ -6,28 +6,23 @@
 
 // Reutilizacion de iteradores
 template <typename Container>
-class CDLLForwardIterator : public circular_iterator<Container, CDLLForwardIterator<Container>> {
-public:
-    using MySelf = CDLLForwardIterator<Container>;
-    using Parent = circular_iterator<Container, MySelf>;
-    using Node   = typename Container::Node;
-
-    CDLLForwardIterator(Container *c, Node *node, Node *root) : Parent(c, node, root) {}
-};
-
-template <typename Container>
-class CDLLBackwardIterator : public circular_iterator<Container, CDLLBackwardIterator<Container>> {
+class CDLLBackwardIterator : public general_iterator<Container, CDLLBackwardIterator<Container>> {
 public:
     using MySelf = CDLLBackwardIterator<Container>;
-    using Parent = circular_iterator<Container, MySelf>;
+    using Parent = general_iterator<Container, MySelf>;
     using Node   = typename Container::Node;
 
-    CDLLBackwardIterator(Container *c, Node *node, Node *root) : Parent(c, node, root) {}
+private:
+    Node* m_startNode;
+
+public:
+    CDLLBackwardIterator(Container *c, Node *node, Node *startNode) 
+        : Parent(c, node), m_startNode(startNode) {}
 
     MySelf& operator++() {
         if (this->m_pNode) {
             Node *prev    = this->m_pNode->getPrev();
-            this->m_pNode = (prev == this->m_pRoot) ? nullptr : prev;
+            this->m_pNode = (prev == m_startNode) ? nullptr : prev;
         }
         return *this;
     }
@@ -39,7 +34,7 @@ public:
     using value_type        = typename Trait::value_type;
     using Node              = typename Trait::Node;
     using MySelf            = CircularDoubleLinkedList<Trait>;
-    using forward_iterator  = CDLLForwardIterator<MySelf>;
+    using forward_iterator  = CLLForwardIterator<MySelf>;
     using backward_iterator = CDLLBackwardIterator<MySelf>;
     friend forward_iterator;
     friend backward_iterator;
@@ -53,16 +48,16 @@ public:
         LinkedList<Trait>::clear();
     }
 
-    forward_iterator cbegin() const {
+    forward_iterator begin() const {
         return forward_iterator(const_cast<MySelf*>(this), this->m_pRoot, this->m_pRoot);
     }
-    forward_iterator cend() const {
+    forward_iterator end() const {
         return forward_iterator(const_cast<MySelf*>(this), nullptr, this->m_pRoot);
     }
-    backward_iterator crbegin() {
+    backward_iterator rbegin() {
         return backward_iterator(this, this->m_tail, this->m_tail);
     }
-    backward_iterator crend() {
+    backward_iterator rend() {
         return backward_iterator(this, nullptr, this->m_tail);
     }
 

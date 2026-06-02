@@ -142,8 +142,8 @@ public:
         m_size  = 0;
     }
 
-    virtual forward_iterator begin() const { return forward_iterator(const_cast<MySelf*>(this), m_pRoot); }
-    virtual forward_iterator end()   const { return forward_iterator(const_cast<MySelf*>(this), nullptr); }
+    forward_iterator begin() const { return forward_iterator(const_cast<MySelf*>(this), m_pRoot); }
+    forward_iterator end()   const { return forward_iterator(const_cast<MySelf*>(this), nullptr); }
 
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&...args) {

@@ -5,13 +5,26 @@
 
 // Reutilizacion de iteradores
 template <typename Container>
-class CLLForwardIterator : public circular_iterator<Container, CLLForwardIterator<Container>> {
+class CLLForwardIterator : public general_iterator<Container, CLLForwardIterator<Container>> {
 public:
     using MySelf = CLLForwardIterator<Container>;
-    using Parent = circular_iterator<Container, MySelf>;
+    using Parent = general_iterator<Container, MySelf>;
     using Node   = typename Container::Node;
 
-    CLLForwardIterator(Container *c, Node *node, Node *root) : Parent(c, node, root) {}
+private:
+    Node* m_startNode;
+
+public:
+    CLLForwardIterator(Container *c, Node *node, Node *startNode) 
+        : Parent(c, node), m_startNode(startNode) {}
+
+    MySelf& operator++() {
+        if (this->m_pNode) {
+            Node *next    = this->m_pNode->getNext();
+            this->m_pNode = (next == m_startNode) ? nullptr : next;
+        }
+        return *this;
+    }
 };
 
 // Node en CLL
@@ -32,10 +45,10 @@ public:
         LinkedList<Trait>::clear();
     }
 
-    forward_iterator cbegin() const {
+    forward_iterator begin() const {
         return forward_iterator(const_cast<MySelf*>(this), this->m_pRoot, this->m_pRoot);
     }
-    forward_iterator cend() const {
+    forward_iterator end() const {
         return forward_iterator(const_cast<MySelf*>(this), nullptr, this->m_pRoot);
     }
 

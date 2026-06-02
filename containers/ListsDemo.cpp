@@ -116,6 +116,10 @@ void DemoCircularLinkedList(Container& cll, const string& name) {
     cout << "4. Insertando elemento 25:" << endl;
     cll.insert(25, 25);
     cout << "   Tamaño final: " << cll.size() << endl;
+    cout << "Estado de la lista: [ ";
+    for (const auto& item : cll) {
+        cout << item << " ";    }
+    cout << "]" << endl;
 
     cout << "   Dando 2 vueltas a la lista circular: ";
     cll.circularForEach(2, [](auto& cll) { cout << cll << " "; });
@@ -154,6 +158,12 @@ void DemoCircularDoubleLinkedList(Container& cdll, const string& name) {
     cout << "5. Insertando 30:" << endl;
     cdll.insert(30, 30);
     cout << "   Tamaño final: " << cdll.size() << endl;
+    cout << "   Estado de la lista: [ ";
+    for (const auto& item : cdll) {
+        cout << item << " ";
+    }
+    cout << "]" << endl;
+    
     cout << "   Dando 2 vueltas a la lista circular: ";
     cdll.circularForEach(2, 1,[](auto& cdll) { cout << cdll << " "; });
     cout << endl;

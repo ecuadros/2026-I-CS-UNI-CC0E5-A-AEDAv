@@ -39,24 +39,5 @@ public:
     }
 };
 
-template <typename Container, class IteratorBase>
-class circular_iterator : public general_iterator<Container, IteratorBase> {
-public:
-    using Node = typename Container::Node;
-protected:
-    Node *m_pRoot;
-public:
-    circular_iterator(Container *pContainer, Node *pNode, Node *pRoot)
-        : general_iterator<Container, IteratorBase>(pContainer, pNode), m_pRoot(pRoot) {}
-    
-    IteratorBase &operator++() {
-        if (this->m_pNode) {
-            Node *next    = this->m_pNode->getNext();
-            this->m_pNode = (next == m_pRoot) ? nullptr : next;
-        }
-        return *(IteratorBase *)this;
-    }
-};
-
 #endif
  
