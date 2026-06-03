@@ -273,6 +273,17 @@ protected:
         return 1 + max(height_r(n->m_pChild[0]), height_r(n->m_pChild[1]));
     }
 
+    // Busca el nodo con la clave dada. Navega igual que internal_insert.
+    Node* find_node(const value_type& key) const {
+        Node* n = m_pRoot;
+        while (n) {
+            if      (m_comp(n->m_data, key)) n = n->m_pChild[0];
+            else if (m_comp(key, n->m_data)) n = n->m_pChild[1];
+            else                             return n;
+        }
+        return nullptr;
+    }
+
     // ToDo Mejora #2: print2D - imprime el arbol rotado 90 grados (derecho=arriba, izquierdo=abajo)
     void print2D_r(ostream& os, Node* n, int depth) const {
         if (!n) return;

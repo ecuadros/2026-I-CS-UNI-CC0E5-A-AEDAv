@@ -4,11 +4,17 @@
 void ListsDemo();
 void BinaryTreeDemo();
 void AVLDemo();
+void DemoMinHeap();
+void DemoMaxHeap();
+void DemoHashTable();
 int main(){
     // DemoVector();
     //DemoConcurrentVector();
     ListsDemo();
     BinaryTreeDemo();
     AVLDemo();
+    DemoMinHeap();
+    DemoMaxHeap();
+    DemoHashTable();
     return 0;
 }
