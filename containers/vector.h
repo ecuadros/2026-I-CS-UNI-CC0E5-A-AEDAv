@@ -5,10 +5,12 @@
 #include <cstddef> // size_t
 #include <string>
 #include <sstream>
+#include <stdexcept>
 #include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
 #include "util.h"
 #include <mutex>
+#include <utility>
 #include "../types.h"
 using namespace std;
 
@@ -53,7 +55,7 @@ public:
     T    getData() const { return m_data; }
     T&   getDataRef() { return m_data; }
     void setData(T data) { m_data = data; }
-    Ref  getRef() { return m_ref; }
+    Ref  getRef() const { return m_ref; }
     void setRef(Ref ref) { m_ref = ref; }
     
 };
@@ -80,10 +82,20 @@ private:
     void    resize();
 public:
     Vector(size_t capacity = 10);
+    Vector(const Vector &other);
+    Vector(Vector &&other);
+    Vector& operator=(const Vector &other);
+    Vector& operator=(Vector &&other);
     virtual ~Vector();
     virtual void push_back(value_type value, Ref ref);
+    virtual void pop_back();
     virtual size_t size() const;
     virtual string toString() const;
+    value_type& operator[](size_t index);
+    const value_type& operator[](size_t index) const;
+    Ref getRef(size_t index) const;
+    void setRef(size_t index, Ref ref);
+    void swap(size_t a, size_t b);
 
     forward_iterator begin() { return forward_iterator(this, m_data); }
     forward_iterator end()   { return forward_iterator(this, m_data + m_size); }
@@ -116,6 +128,53 @@ Vector<T>::Vector(size_t capacity){
 }
 
 template <typename T>
+Vector<T>::Vector(const Vector &other){
+    shared_lock<shared_mutex> lock(other.m_mtx);
+    m_capacity = other.m_capacity;
+    m_size = other.m_size;
+    m_data = new Node[m_capacity];
+    for(size_t i = 0; i < m_size; ++i)
+        m_data[i] = other.m_data[i];
+}
+
+template <typename T>
+Vector<T>::Vector(Vector &&other){
+    unique_lock<shared_mutex> lock(other.m_mtx);
+    m_capacity = std::exchange(other.m_capacity, 0);
+    m_size = std::exchange(other.m_size, 0);
+    m_data = std::exchange(other.m_data, nullptr);
+}
+
+template <typename T>
+Vector<T>& Vector<T>::operator=(const Vector &other){
+    if(this != &other){
+        unique_lock<shared_mutex> lock(m_mtx);
+        shared_lock<shared_mutex> otherLock(other.m_mtx);
+        Node *new_data = new Node[other.m_capacity];
+        for(size_t i = 0; i < other.m_size; ++i)
+            new_data[i] = other.m_data[i];
+        delete [] m_data;
+        m_capacity = other.m_capacity;
+        m_size = other.m_size;
+        m_data = new_data;
+    }
+    return *this;
+}
+
+template <typename T>
+Vector<T>& Vector<T>::operator=(Vector &&other){
+    if(this != &other){
+        unique_lock<shared_mutex> lock(m_mtx);
+        unique_lock<shared_mutex> otherLock(other.m_mtx);
+        delete [] m_data;
+        m_capacity = std::exchange(other.m_capacity, 0);
+        m_size = std::exchange(other.m_size, 0);
+        m_data = std::exchange(other.m_data, nullptr);
+    }
+    return *this;
+}
+
+template <typename T>
 Vector<T>::~Vector(){
     delete [] m_data;
 }
@@ -139,9 +198,57 @@ void Vector<T>::push_back(value_type value, Ref ref){
 }
 
 template <typename T>
+void Vector<T>::pop_back(){
+    unique_lock<shared_mutex> lock(m_mtx);
+    if(m_size == 0)
+        throw out_of_range("Vector vacio");
+    --m_size;
+}
+
+template <typename T>
 size_t Vector<T>::size() const{
     shared_lock<shared_mutex> lock(m_mtx);
     return m_size;
+}
+
+template <typename T>
+typename Vector<T>::value_type& Vector<T>::operator[](size_t index){
+    shared_lock<shared_mutex> lock(m_mtx);
+    if(index >= m_size)
+        throw out_of_range("Indice fuera de rango");
+    return m_data[index].getDataRef();
+}
+
+template <typename T>
+const typename Vector<T>::value_type& Vector<T>::operator[](size_t index) const{
+    shared_lock<shared_mutex> lock(m_mtx);
+    if(index >= m_size)
+        throw out_of_range("Indice fuera de rango");
+    return m_data[index].getDataRef();
+}
+
+template <typename T>
+Ref Vector<T>::getRef(size_t index) const{
+    shared_lock<shared_mutex> lock(m_mtx);
+    if(index >= m_size)
+        throw out_of_range("Indice fuera de rango");
+    return m_data[index].getRef();
+}
+
+template <typename T>
+void Vector<T>::setRef(size_t index, Ref ref){
+    unique_lock<shared_mutex> lock(m_mtx);
+    if(index >= m_size)
+        throw out_of_range("Indice fuera de rango");
+    m_data[index].setRef(ref);
+}
+
+template <typename T>
+void Vector<T>::swap(size_t a, size_t b){
+    unique_lock<shared_mutex> lock(m_mtx);
+    if(a >= m_size || b >= m_size)
+        throw out_of_range("Indice fuera de rango");
+    std::swap(m_data[a], m_data[b]);
 }
 
 template <typename T>

@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <mutex>
 #include <shared_mutex> 
+#include <type_traits>
 #include <utility>
 #include <tuple>
 #include "general_iterator.h"
@@ -33,10 +34,12 @@ public:
 };
 
 // Linked List Node
-template <typename T>
+template <typename T, typename NodeType = void>
 class LLNode{
 protected:
-    using Node = NodeType;
+    using Node = std::conditional_t<std::is_void_v<NodeType>, LLNode<T>, NodeType>;
+public:
+    using value_type = T;
 private:
     T   m_data;
     Ref m_ref;
@@ -52,6 +55,7 @@ public:
     void   setData(T data) { m_data = data; }
     Ref    getRef() const  { return m_ref; }
     void   setRef(Ref ref) { m_ref = ref; }
+    Node*  getNext() const { return m_next; }
     Node*  ngetNext() const { return m_next; }
     Node*& getNextRef()    { return m_next; }
     void   setNext(Node *next) { m_next = next; }
@@ -79,7 +83,7 @@ public:
     using forward_iterator = LinkedListForwardIterator<MySelf>;
     friend forward_iterator;
 
-private:
+protected:
     Node *m_pRoot = nullptr;
     Node *m_tail = nullptr;
     size_t m_size = 0;
