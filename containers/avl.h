@@ -7,7 +7,8 @@ using namespace std;
 template<typename T>
 struct AVLNode : public BinaryTreeNode<T, AVLNode<T>> {
     size_t m_height = 1;
-    AVLNode(T data, Ref ref) : BinaryTreeNode<T, AVLNode<T>>(data, ref) {}
+    AVLNode(T data, Ref ref, AVLNode<T>* parent = nullptr)
+        : BinaryTreeNode<T, AVLNode<T>>(data, ref, parent) {}
 };
 
 // Traits
@@ -27,7 +28,7 @@ public:
     // Copy constructor propio: llama al vtable de AVL -> internal_copy preserva m_height
     AVL(const AVL& other) : BinaryTree<Trait>() {
         shared_lock<shared_mutex> lock(other.m_mtx);
-        internal_copy(this->m_pRoot, other.m_pRoot);
+        internal_copy(this->m_pRoot, other.m_pRoot, nullptr);
     }
 
 private:
@@ -41,10 +42,13 @@ private:
     }
 
     void rotate(Node*& n, size_t dir) {
-        size_t other           = 1 - dir;
+        size_t other           = !dir;
         Node* child            = n->m_pChild[dir];
         n->m_pChild[dir]       = child->m_pChild[other];
+        if(n->m_pChild[dir]) n->m_pChild[dir]->m_pParent = n;   // subarbol que cambia de dueno
+        child->m_pParent       = n->m_pParent;                  // child ocupa el lugar de n
         child->m_pChild[other] = n;
+        n->m_pParent           = child;                         // n baja bajo child
         update_height(n);
         update_height(child);
         n = child;
@@ -65,17 +69,17 @@ private:
     }
 
 protected:
-    void internal_insert(Node*& pNode, const value_type& data, Ref ref) override {
-        BinaryTree<Trait>::internal_insert(pNode, data, ref);
+    void internal_insert(Node*& pNode, const value_type& data, Ref ref, Node* parent) override {
+        BinaryTree<Trait>::internal_insert(pNode, data, ref, parent);
         rebalance(pNode);
     }
 
-    void internal_copy(Node*& dst, Node* src) override {
+    void internal_copy(Node*& dst, Node* src, Node* parent) override {
         if(!src) { dst = nullptr; return; }
-        dst = new Node(src->m_data, src->m_ref);
+        dst = new Node(src->m_data, src->m_ref, parent);
         dst->m_height = src->m_height;
-        internal_copy(dst->m_pChild[0], src->m_pChild[0]);
-        internal_copy(dst->m_pChild[1], src->m_pChild[1]);
+        internal_copy(dst->m_pChild[0], src->m_pChild[0], dst);
+        internal_copy(dst->m_pChild[1], src->m_pChild[1], dst);
     }
 
 public:

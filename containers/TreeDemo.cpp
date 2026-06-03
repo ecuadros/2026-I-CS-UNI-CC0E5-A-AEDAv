@@ -51,6 +51,12 @@ void TreeDemo() {
     tree.ForEach([](auto& x){ cout << x*2 << " "; });
     cout << endl;
 
+    cout << "rinorder:   "; for(auto& x : tree.rinorder())   cout << x << " "; cout << endl;
+    cout << "rpreorder:  "; for(auto& x : tree.rpreorder())  cout << x << " "; cout << endl;
+    cout << "rpostorder: "; for(auto& x : tree.rpostorder()) cout << x << " "; cout << endl;
+    cout << "toString(PREORDER):  " << tree.toString(Traversal::PREORDER)  << endl;
+    cout << "toString(POSTORDER): " << tree.toString(Traversal::POSTORDER) << endl;
+
     // operator>> — persistencia
     ofstream os("BT.txt");
     os << tree << endl;
