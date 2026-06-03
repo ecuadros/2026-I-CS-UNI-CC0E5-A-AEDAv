@@ -6,7 +6,7 @@ template <typename _Node, typename _Comp>
 struct BaseTrait{
     using Node       = _Node;
     using value_type = typename _Node::value_type;
-    using Comp       = _Comp;
+    using Comp       = _Comp;// comparador para mantener el orden
 };
 
 template <typename _Node>
