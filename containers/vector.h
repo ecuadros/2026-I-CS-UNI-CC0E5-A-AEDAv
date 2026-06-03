@@ -19,23 +19,40 @@ public:
     using value_type      = typename Trait::value_type;
     using Node            = typename Trait::Node;
     using Comp            = typename Trait::Comp;
-    class ForwardIterator {
-        Node* m_ptr;
+    using MySelf          = Vector<Trait>;
+
+    class ForwardIterator : public general_iterator<MySelf, ForwardIterator> {
     public:
-        ForwardIterator(Node* p) : m_ptr(p) {}
-        Node&            operator*()  { return *m_ptr; }
-        ForwardIterator& operator++() { ++m_ptr; return *this; }
-        bool operator==(const ForwardIterator& o) const { return m_ptr == o.m_ptr; }
-        bool operator!=(const ForwardIterator& o) const { return m_ptr != o.m_ptr; }
+        using MyBase = general_iterator<MySelf, ForwardIterator>;
+        using MyBase::MyBase;
+
+        ForwardIterator operator++() {
+            if (this->m_pNode) {
+                ++this->m_pNode;
+            }
+            return *this;
+        }
+
+        Node& operator*() {
+            return *this->m_pNode;
+        }
     };
-    class BackwardIterator {
-        Node* m_ptr;
+
+    class BackwardIterator : public general_iterator<MySelf, BackwardIterator> {
     public:
-        BackwardIterator(Node* p) : m_ptr(p) {}
-        Node&             operator*()  { return *m_ptr; }
-        BackwardIterator& operator++() { --m_ptr; return *this; }
-        bool operator==(const BackwardIterator& o) const { return m_ptr == o.m_ptr; }
-        bool operator!=(const BackwardIterator& o) const { return m_ptr != o.m_ptr; }
+        using MyBase = general_iterator<MySelf, BackwardIterator>;
+        using MyBase::MyBase;
+
+        BackwardIterator operator++() {
+            if (this->m_pNode) {
+                --this->m_pNode;
+            }
+            return *this;
+        }
+
+        Node& operator*() {
+            return *this->m_pNode;
+        }
     };
 
 private:
@@ -125,10 +142,10 @@ public:
         return m_size;
     }
 
-    ForwardIterator  begin() { return ForwardIterator (m_data); }
-    ForwardIterator  end()   { return ForwardIterator (m_data + m_size); }
-    BackwardIterator rbegin(){ return BackwardIterator(m_data + m_size - 1); }
-    BackwardIterator rend()  { return BackwardIterator(m_data - 1); }
+    ForwardIterator  begin() { return ForwardIterator(this, m_data); }
+    ForwardIterator  end()   { return ForwardIterator(this, m_data + m_size); }
+    BackwardIterator rbegin(){ return BackwardIterator(this, m_data + m_size - 1); }
+    BackwardIterator rend()  { return BackwardIterator(this, m_data - 1); }
 
     //forEach
     template<typename Func, typename... Args>
