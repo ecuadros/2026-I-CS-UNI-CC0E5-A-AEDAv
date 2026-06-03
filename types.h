@@ -11,7 +11,7 @@ using Type = int;
 // It must work for windows, linux, iOS, macOS, android, etc.
 
 using T1 = int;
-
+using T2 = char;
 using Ref = long;
 
 #endif // __TYPES_H__
