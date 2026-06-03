@@ -4,6 +4,7 @@
 #include "../types.h"
 #include "BinaryTree.h"
 #include "avl.h"
+#include "hashtable.h"
 using namespace std;
 
 void TreeDemo() {
@@ -106,4 +107,32 @@ void TreeDemo() {
     // copy constructor
     AVL<AscendingAVLTrait<T1>> avlCopia(avl);
     cout << "copia:  " << avlCopia << " height: " << avlCopia.height() << endl;
+
+    // HashTable Demo
+    cout << "\n=== HashTable Demo ===" << endl;
+    HashTable<AscendingAVLTrait<T1>> m;
+    m[5] = 3;
+    m[2] = 7;
+    m[8] = 1;
+    m[2] = 9;   // actualiza la clave existente
+    cout << "operator<<: " << m << endl;
+
+    cout << "[key,value]: ";
+    for(const auto& [k, v] : m) cout << "(" << k << "->" << v << ") ";
+    cout << endl;
+
+    // persistencia round-trip
+    ofstream osh("HASH.txt"); osh << m << endl;
+    HashTable<AscendingAVLTrait<T1>> m2;
+    ifstream ish("HASH.txt"); ish >> m2;
+    cout << "leida desde archivo: " << m2 << endl;
+
+    // copy independiente
+    HashTable<AscendingAVLTrait<T1>> m3(m);
+    m3[5] = 99;
+    cout << "original m[5]=" << m[5] << " | copia m3[5]=" << m3[5] << endl;
+
+    // move
+    HashTable<AscendingAVLTrait<T1>> m4(move(m3));
+    cout << "movida: " << m4 << endl;
 }

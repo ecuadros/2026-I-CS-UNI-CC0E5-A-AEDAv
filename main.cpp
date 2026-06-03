@@ -8,9 +8,13 @@
 
 void ListsDemo();
 void TreeDemo();
+void DemoMinHeap();
+void DemoMaxHeap();
 
 int main(){
     ListsDemo();
     TreeDemo();
+    DemoMinHeap();
+    DemoMaxHeap();
     return 0;
 }

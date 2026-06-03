@@ -77,6 +77,7 @@ public:
     typename Node::value_type& operator*() {
         return m_nodes[m_index]->getDataRef();
     }
+    Node* node() const { return m_nodes[m_index]; }
     bool operator==(const TreeIteratorBase& o) const { return m_index == o.m_index; }
     bool operator!=(const TreeIteratorBase& o) const { return m_index != o.m_index; }
 };
@@ -166,6 +167,16 @@ protected:
         delete node;
     }
 
+    // Sin lock: lo invoca el caller que ya tomo el lock. Devuelve el nodo o nullptr.
+    Node* find_node(const value_type& key) const {
+        Node* node = m_pRoot;
+        while(node) {
+            if(!m_comp(node->m_data, key) && !m_comp(key, node->m_data)) return node;
+            node = node->m_pChild[!m_comp(node->m_data, key)];
+        }
+        return nullptr;
+    }
+
 public:
     BinaryTree() {}
 
@@ -253,7 +264,7 @@ public:
     void printTree(ostream& os) const {
         shared_lock<shared_mutex> lock(m_mtx);
         if(!m_pRoot) { os << "(empty)\n"; return; }
-        Vector<Node*> queue;
+        Vector<VectorTrait<Node*>> queue;
         queue.push_back(m_pRoot, 0);
         size_t levelStart = 0;
         while(levelStart < queue.size()) {

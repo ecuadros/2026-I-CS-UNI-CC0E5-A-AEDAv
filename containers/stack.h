@@ -5,7 +5,7 @@ using namespace std;
 
 template<typename T>
 class Stack {
-    Vector<T> m_data;
+    Vector<VectorTrait<T>> m_data;
 public:
     Stack() {}
     Stack(const Stack& other)            : m_data(other.m_data)        {}

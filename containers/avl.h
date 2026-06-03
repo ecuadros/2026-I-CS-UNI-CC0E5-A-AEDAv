@@ -30,6 +30,9 @@ public:
         internal_copy(this->m_pRoot, other.m_pRoot);
     }
 
+    // Move real: delega en BinaryTree (declarar copy ctor elimina el move implicito)
+    AVL(AVL&& other) noexcept : BinaryTree<Trait>(move(other)) {}
+
 private:
     size_t    height(Node* n)        { return n ? n->m_height : 0; }
 
