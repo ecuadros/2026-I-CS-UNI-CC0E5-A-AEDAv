@@ -15,7 +15,6 @@ using namespace std;
 #include "../types.h"
 #include "traits.h"
 #include "stack.h"
-#include "general_iterator.h"
 
 // ─── BinaryTreeNode (CRTP) ───────────────────────────────────────────────────
 // m_pChild[0] = right (larger en ascending), m_pChild[1] = left (smaller)
@@ -26,16 +25,10 @@ struct BinaryTreeNode {
     T     m_data;
     Ref   m_ref;
     Node* m_pChild[2];
-    Node* m_pParent;
-    BinaryTreeNode(T data, Ref ref, Node* parent = nullptr)
-        : m_data(data), m_ref(ref), m_pChild{nullptr, nullptr}, m_pParent(parent) {}
+    BinaryTreeNode(T data, Ref ref)
+        : m_data(data), m_ref(ref), m_pChild{nullptr, nullptr} {}
     T&   getDataRef()   { return m_data; }
     Ref  getRef() const { return m_ref;  }
-    string toString() const {
-        ostringstream oss;
-        oss << "(" << m_data << "," << m_ref << ")";
-        return oss.str();
-    }
 };
 
 // Traits genéricos para BinaryTree
@@ -44,72 +37,77 @@ struct AscendingBTTrait  : BaseTrait<BinaryTreeNode<T>, less<T>>    {};
 template<typename T>
 struct DescendingBTTrait : BaseTrait<BinaryTreeNode<T>, greater<T>> {};
 
-// Iteradores. L=1 forward, L=0 reverse; !L = el otro hijo.
-template<typename Container, size_t L>
-class InorderIter : public general_iterator<Container, InorderIter<Container, L>> {
+// ─── fill helpers ────────────────────────────────────────────────────────────
+// m_pChild[1] = left (menor en ascending), m_pChild[0] = right (mayor)
+template<typename Node>
+void fill_inorder(Node* n, Stack<Node*>& s) {
+    if(!n) return;
+    fill_inorder(n->m_pChild[1], s);
+    s.push(n);
+    fill_inorder(n->m_pChild[0], s);
+}
+
+template<typename Node>
+void fill_preorder(Node* n, Stack<Node*>& s) {
+    if(!n) return;
+    s.push(n);
+    fill_preorder(n->m_pChild[1], s);
+    fill_preorder(n->m_pChild[0], s);
+}
+
+template<typename Node>
+void fill_postorder(Node* n, Stack<Node*>& s) {
+    if(!n) return;
+    fill_postorder(n->m_pChild[1], s);
+    fill_postorder(n->m_pChild[0], s);
+    s.push(n);
+}
+
+// ─── TreeIteratorBase ──────────────────────────────────────────────────────────
+template<typename Node>
+class TreeIteratorBase {
+protected:
+    Stack<Node*> m_nodes;
+    ptrdiff_t    m_index;
 public:
-    using Node = typename Container::Node;
-    using general_iterator<Container, InorderIter<Container, L>>::general_iterator;
-    static Node* first(Node* n) { while(n && n->m_pChild[L]) n = n->m_pChild[L]; return n; }
-    InorderIter operator++() {
-        Node* n = this->m_pNode;
-        if(n->m_pChild[!L]) { this->m_pNode = first(n->m_pChild[!L]); return *this; }
-        Node* p = n->m_pParent;
-        while(p && n == p->m_pChild[!L]) { n = p; p = p->m_pParent; }
-        this->m_pNode = p;
-        return *this;
+    TreeIteratorBase() : m_index(0) {}
+    TreeIteratorBase(Stack<Node*> nodes, ptrdiff_t idx)
+        : m_nodes(move(nodes)), m_index(idx) {}
+
+    typename Node::value_type& operator*() {
+        return m_nodes[m_index]->getDataRef();
     }
+    Node* node() const { return m_nodes[m_index]; }
+    bool operator==(const TreeIteratorBase& o) const { return m_index == o.m_index; }
+    bool operator!=(const TreeIteratorBase& o) const { return m_index != o.m_index; }
 };
 
-template<typename Container, size_t L>
-class PreorderIter : public general_iterator<Container, PreorderIter<Container, L>> {
+// ─── TreeForwardIterator ───────────────────────────────────────────────────────
+template<typename Node>
+class TreeForwardIterator : public TreeIteratorBase<Node> {
 public:
-    using Node = typename Container::Node;
-    using general_iterator<Container, PreorderIter<Container, L>>::general_iterator;
-    static Node* first(Node* n) { return n; }
-    PreorderIter operator++() {
-        Node* n = this->m_pNode;
-        if(n->m_pChild[L])  { this->m_pNode = n->m_pChild[L];  return *this; }
-        if(n->m_pChild[!L]) { this->m_pNode = n->m_pChild[!L]; return *this; }
-        for(Node* p = n->m_pParent; p; n = p, p = p->m_pParent)
-            if(n == p->m_pChild[L] && p->m_pChild[!L]) { this->m_pNode = p->m_pChild[!L]; return *this; }
-        this->m_pNode = nullptr;
-        return *this;
-    }
+    using TreeIteratorBase<Node>::TreeIteratorBase;
+    TreeForwardIterator& operator++() { ++this->m_index; return *this; }
 };
 
-template<typename Container, size_t L>
-class PostorderIter : public general_iterator<Container, PostorderIter<Container, L>> {
+// ─── TreeReverseIterator ──────────────────────────────────────────────────────
+template<typename Node>
+class TreeReverseIterator : public TreeIteratorBase<Node> {
 public:
-    using Node = typename Container::Node;
-    using general_iterator<Container, PostorderIter<Container, L>>::general_iterator;
-    static Node* first(Node* n) {
-        while(n) {
-            if(n->m_pChild[L])       n = n->m_pChild[L];
-            else if(n->m_pChild[!L]) n = n->m_pChild[!L];
-            else return n;
-        }
-        return nullptr;
-    }
-    PostorderIter operator++() {
-        Node* n = this->m_pNode, *p = n->m_pParent;
-        if(p && n == p->m_pChild[L] && p->m_pChild[!L]) this->m_pNode = first(p->m_pChild[!L]);
-        else this->m_pNode = p;
-        return *this;
-    }
+    using TreeIteratorBase<Node>::TreeIteratorBase;
+    TreeReverseIterator& operator++() { --this->m_index; return *this; }
 };
 
-// Agrupa begin/end (+rbegin/rend)
-template<typename FwdIter, typename RevIter>
-struct TreeRange {
-    FwdIter m_begin, m_end;
-    RevIter m_rbegin, m_rend;
-    shared_lock<shared_mutex> m_lock;
+// ─── TreeSnapshot ───────────────────────────────────────────────────────────
+template<typename Node>
+struct TreeSnapshot {
+    TreeForwardIterator<Node>  m_begin, m_end;
+    TreeReverseIterator<Node> m_rbegin, m_rend;
 
-    FwdIter begin()  { return m_begin;  }
-    FwdIter end()    { return m_end;    }
-    RevIter rbegin() { return m_rbegin; }
-    RevIter rend()   { return m_rend;   }
+    TreeForwardIterator<Node>  begin()  { return m_begin;  }
+    TreeForwardIterator<Node>  end()    { return m_end;    }
+    TreeReverseIterator<Node> rbegin() { return m_rbegin; }
+    TreeReverseIterator<Node> rend()   { return m_rend;   }
 
     template<typename Func, typename... Args>
     void forEach(Func func, Args&&... args) {
@@ -124,7 +122,17 @@ struct TreeRange {
     }
 };
 
-enum class Traversal { INORDER, PREORDER, POSTORDER };
+template<typename Node>
+TreeSnapshot<Node> make_view(Stack<Node*> s) {
+    size_t n = s.size();
+    Stack<Node*> s2 = s;
+    TreeSnapshot<Node> v;
+    v.m_begin  = TreeForwardIterator<Node> (move(s),  0);
+    v.m_end    = TreeForwardIterator<Node> ({},        (ptrdiff_t)n);
+    v.m_rbegin = TreeReverseIterator<Node>(move(s2), (ptrdiff_t)n - 1);
+    v.m_rend   = TreeReverseIterator<Node>({},        -1);
+    return v;
+}
 
 // ─── BinaryTree ──────────────────────────────────────────────────────────────
 template<typename Trait>
@@ -134,31 +142,22 @@ public:
     using Node       = typename Trait::Node;
     using Comp       = typename Trait::Comp;
 
-    // Reverso exacto via L=0. Identidad: reverso-preorder = espejo-postorder y
-    // reverso-postorder = espejo-preorder
-    using inorder_fwd   = InorderIter<BinaryTree, 1>;
-    using inorder_rev   = InorderIter<BinaryTree, 0>;
-    using preorder_fwd  = PreorderIter<BinaryTree, 1>;
-    using preorder_rev  = PostorderIter<BinaryTree, 0>;
-    using postorder_fwd = PostorderIter<BinaryTree, 1>;
-    using postorder_rev = PreorderIter<BinaryTree, 0>;
-
 protected:
     Node*  m_pRoot = nullptr;
     Comp   m_comp;
     mutable shared_mutex m_mtx;
 
-    virtual void internal_insert(Node*& pNode, const value_type& data, Ref ref, Node* parent = nullptr) {
-        if(!pNode) { pNode = new Node(data, ref, parent); return; }
+    virtual void internal_insert(Node*& pNode, const value_type& data, Ref ref) {
+        if(!pNode) { pNode = new Node(data, ref); return; }
         auto branch = !m_comp(pNode->m_data, data);
-        internal_insert(pNode->m_pChild[branch], data, ref, pNode);
+        internal_insert(pNode->m_pChild[branch], data, ref);
     }
 
-    virtual void internal_copy(Node*& dst, Node* src, Node* parent = nullptr) {
+    virtual void internal_copy(Node*& dst, Node* src) {
         if(!src) { dst = nullptr; return; }
-        dst = new Node(src->m_data, src->m_ref, parent);
-        internal_copy(dst->m_pChild[0], src->m_pChild[0], dst);
-        internal_copy(dst->m_pChild[1], src->m_pChild[1], dst);
+        dst = new Node(src->m_data, src->m_ref);
+        internal_copy(dst->m_pChild[0], src->m_pChild[0]);
+        internal_copy(dst->m_pChild[1], src->m_pChild[1]);
     }
 
     virtual void internal_clear(Node* node) {
@@ -168,11 +167,14 @@ protected:
         delete node;
     }
 
-    template<typename Fwd, typename Rev>
-    TreeRange<Fwd, Rev> view() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { Fwd(this, Fwd::first(m_pRoot)), Fwd(this, nullptr),
-                 Rev(this, Rev::first(m_pRoot)), Rev(this, nullptr), move(lock) };
+    // Sin lock: lo invoca el caller que ya tomo el lock. Devuelve el nodo o nullptr.
+    Node* find_node(const value_type& key) const {
+        Node* node = m_pRoot;
+        while(node) {
+            if(!m_comp(node->m_data, key) && !m_comp(key, node->m_data)) return node;
+            node = node->m_pChild[!m_comp(node->m_data, key)];
+        }
+        return nullptr;
     }
 
 public:
@@ -211,40 +213,48 @@ public:
         throw runtime_error("BinaryTree::search: not found");
     }
 
-    // 6 recorridos
-    auto inorder()    { return view<inorder_fwd,   inorder_rev>();   }
-    auto rinorder()   { return view<inorder_rev,   inorder_fwd>();   }
-    auto preorder()   { return view<preorder_fwd,  preorder_rev>();  }
-    auto rpreorder()  { return view<preorder_rev,  preorder_fwd>();  }
-    auto postorder()  { return view<postorder_fwd, postorder_rev>(); }
-    auto rpostorder() { return view<postorder_rev, postorder_fwd>(); }
+    // Traversals con shared_lock — devuelven snapshot del árbol
+    TreeSnapshot<Node> inorder() {
+        shared_lock<shared_mutex> lock(m_mtx);
+        Stack<Node*> s; fill_inorder(m_pRoot, s);
+        return make_view(move(s));
+    }
+
+    TreeSnapshot<Node> preorder() {
+        shared_lock<shared_mutex> lock(m_mtx);
+        Stack<Node*> s; fill_preorder(m_pRoot, s);
+        return make_view(move(s));
+    }
+
+    TreeSnapshot<Node> postorder() {
+        shared_lock<shared_mutex> lock(m_mtx);
+        Stack<Node*> s; fill_postorder(m_pRoot, s);
+        return make_view(move(s));
+    }
 
     // begin/end delegan a inorder -> range-based for usa inorder por defecto
-    inorder_fwd begin()  { shared_lock<shared_mutex> lock(m_mtx); return inorder_fwd(this, inorder_fwd::first(m_pRoot)); }
-    inorder_fwd end()    { return inorder_fwd(this, nullptr); }
-    inorder_rev rbegin() { shared_lock<shared_mutex> lock(m_mtx); return inorder_rev(this, inorder_rev::first(m_pRoot)); }
-    inorder_rev rend()   { return inorder_rev(this, nullptr); }
+    TreeForwardIterator<Node>  begin()  { return inorder().m_begin;  }
+    TreeForwardIterator<Node>  end()    { return inorder().m_end;    }
+    TreeReverseIterator<Node> rbegin() { return inorder().m_rbegin; }
+    TreeReverseIterator<Node> rend()   { return inorder().m_rend;   }
 
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        for(inorder_fwd it(this, inorder_fwd::first(m_pRoot)), e(this, nullptr); it != e; ++it)
-            func(*it, forward<Args>(args)...);
+        Stack<Node*> s; fill_inorder(m_pRoot, s);
+        for(size_t i = 0; i < s.size(); ++i)
+            func(s[i]->getDataRef(), forward<Args>(args)...);
     }
 
-    // toString segun el recorrido; delega en node->toString() (no toca m_data).
-    string toString(Traversal order = Traversal::INORDER) const {
+    string toString() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        BinaryTree* self = const_cast<BinaryTree*>(this);
-        ostringstream oss; oss << "[";
-        bool first = true;
-        auto dump = [&](auto it, auto e) {
-            for(; it != e; ++it) { oss << (first ? "" : ",") << it.getNode()->toString(); first = false; }
-        };
-        switch(order) {
-            case Traversal::INORDER:   dump(inorder_fwd(self, inorder_fwd::first(m_pRoot)),     inorder_fwd(self, nullptr));   break;
-            case Traversal::PREORDER:  dump(preorder_fwd(self, preorder_fwd::first(m_pRoot)),   preorder_fwd(self, nullptr));  break;
-            case Traversal::POSTORDER: dump(postorder_fwd(self, postorder_fwd::first(m_pRoot)), postorder_fwd(self, nullptr)); break;
+        Stack<Node*> s;
+        fill_inorder(m_pRoot, s);
+        ostringstream oss;
+        oss << "[";
+        for(size_t i = 0; i < s.size(); ++i) {
+            if(i) oss << ",";
+            oss << "(" << s[i]->m_data << "," << s[i]->m_ref << ")";
         }
         oss << "]";
         return oss.str();
@@ -254,7 +264,7 @@ public:
     void printTree(ostream& os) const {
         shared_lock<shared_mutex> lock(m_mtx);
         if(!m_pRoot) { os << "(empty)\n"; return; }
-        Vector<Node*> queue;
+        Vector<VectorTrait<Node*>> queue;
         queue.push_back(m_pRoot, 0);
         size_t levelStart = 0;
         while(levelStart < queue.size()) {
@@ -271,7 +281,15 @@ public:
     }
 
     friend ostream& operator<<(ostream& os, const BinaryTree& t) {
-        return os << t.toString();
+        shared_lock<shared_mutex> lock(t.m_mtx);
+        Stack<Node*> s; fill_inorder(t.m_pRoot, s);
+        os << "[";
+        for(size_t i = 0; i < s.size(); ++i) {
+            if(i) os << ",";
+            os << "(" << s[i]->m_data << "," << s[i]->m_ref << ")";
+        }
+        os << "]";
+        return os;
     }
 
     friend istream& operator>>(istream& is, BinaryTree& t) {
