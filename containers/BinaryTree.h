@@ -168,6 +168,13 @@ protected:
         delete node;
     }
 
+    template<typename Fwd, typename Rev>
+    TreeRange<Fwd, Rev> view() {
+        shared_lock<shared_mutex> lock(m_mtx);
+        return { Fwd(this, Fwd::first(m_pRoot)), Fwd(this, nullptr),
+                 Rev(this, Rev::first(m_pRoot)), Rev(this, nullptr), move(lock) };
+    }
+
 public:
     BinaryTree() {}
 
@@ -204,37 +211,13 @@ public:
         throw runtime_error("BinaryTree::search: not found");
     }
 
-    // 6 recorridos: siembran los iteradores
-    TreeRange<inorder_fwd, inorder_rev> inorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { inorder_fwd(this, inorder_fwd::first(m_pRoot)), inorder_fwd(this, nullptr),
-                 inorder_rev(this, inorder_rev::first(m_pRoot)), inorder_rev(this, nullptr), move(lock) };
-    }
-    TreeRange<inorder_rev, inorder_fwd> rinorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { inorder_rev(this, inorder_rev::first(m_pRoot)), inorder_rev(this, nullptr),
-                 inorder_fwd(this, inorder_fwd::first(m_pRoot)), inorder_fwd(this, nullptr), move(lock) };
-    }
-    TreeRange<preorder_fwd, preorder_rev> preorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { preorder_fwd(this, preorder_fwd::first(m_pRoot)), preorder_fwd(this, nullptr),
-                 preorder_rev(this, preorder_rev::first(m_pRoot)), preorder_rev(this, nullptr), move(lock) };
-    }
-    TreeRange<preorder_rev, preorder_fwd> rpreorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { preorder_rev(this, preorder_rev::first(m_pRoot)), preorder_rev(this, nullptr),
-                 preorder_fwd(this, preorder_fwd::first(m_pRoot)), preorder_fwd(this, nullptr), move(lock) };
-    }
-    TreeRange<postorder_fwd, postorder_rev> postorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { postorder_fwd(this, postorder_fwd::first(m_pRoot)), postorder_fwd(this, nullptr),
-                 postorder_rev(this, postorder_rev::first(m_pRoot)), postorder_rev(this, nullptr), move(lock) };
-    }
-    TreeRange<postorder_rev, postorder_fwd> rpostorder() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        return { postorder_rev(this, postorder_rev::first(m_pRoot)), postorder_rev(this, nullptr),
-                 postorder_fwd(this, postorder_fwd::first(m_pRoot)), postorder_fwd(this, nullptr), move(lock) };
-    }
+    // 6 recorridos
+    auto inorder()    { return view<inorder_fwd,   inorder_rev>();   }
+    auto rinorder()   { return view<inorder_rev,   inorder_fwd>();   }
+    auto preorder()   { return view<preorder_fwd,  preorder_rev>();  }
+    auto rpreorder()  { return view<preorder_rev,  preorder_fwd>();  }
+    auto postorder()  { return view<postorder_fwd, postorder_rev>(); }
+    auto rpostorder() { return view<postorder_rev, postorder_fwd>(); }
 
     // begin/end delegan a inorder -> range-based for usa inorder por defecto
     inorder_fwd begin()  { shared_lock<shared_mutex> lock(m_mtx); return inorder_fwd(this, inorder_fwd::first(m_pRoot)); }
