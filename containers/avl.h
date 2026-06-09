@@ -71,9 +71,7 @@ private:
 protected:
     // internal_insert: delega a BinaryTree y luego rebalancea
     void internal_insert(Node* &node, const value_type &data, Ref ref) override {
-        if (!node) { node = new Node(data, ref); return; }
-        auto branch = !this->m_cmp(data, node->m_data);
-        internal_insert(node->m_child[branch], data, ref);
+        BinaryTree<Trait>::internal_insert(node, data, ref);
         rebalance(node);
     }
 

@@ -285,6 +285,15 @@ public:
         return {found->m_data, found->m_ref};
     }
 
+    value_type* find_exact(const value_type& data) const {
+        shared_lock<shared_mutex> lock(m_lock);
+        Node* found = internal_search(m_root, data);
+        if (found) {
+            return &(found->m_data); // Devolvemos la dirección de memoria del dato
+        }
+        return nullptr;
+    }
+
     size_t size() const {
         shared_lock<shared_mutex> lock(m_lock);
         return internal_size(m_root);

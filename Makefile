@@ -8,7 +8,8 @@ SRCS = main.cpp \
 	   containers/ListsDemo.cpp \
 	   containers/BinaryTreeDemo.cpp \
 	   containers/AVLDemo.cpp \
-	   containers/HeapDemo.cpp
+	   containers/HeapDemo.cpp \
+	   containers/HashTableDemo.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 
