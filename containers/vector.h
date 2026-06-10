@@ -71,6 +71,17 @@ ostream& operator<<(ostream& os, VectorNode<T>& node){
     return os << "(" << node.getData() << ", " << node.getRef() << ")";
 }
 
+template <typename T>
+istream& operator>>(istream& is, VectorNode<T>& node){
+    char ch; T data; Ref ref;
+    if(!(is >> ch) || ch != '(') { is.setstate(ios_base::failbit); return is; }
+    if(!(is >> data >> ch) || ch != ',') { is.setstate(ios_base::failbit); return is; }
+    if(!(is >> ref >> ch) || ch != ')') { is.setstate(ios_base::failbit); return is; }
+    node.setData(data);
+    node.setRef(ref);
+    return is;
+}
+
 template <typename Trait>
 class Vector{
 public:

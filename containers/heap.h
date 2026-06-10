@@ -103,8 +103,8 @@ public:
         ostringstream oss;
         oss << "[";
         for(size_t i = 0; i < m_vec.size(); ++i) {
-            if(i) oss << ",";
-            oss << "(" << m_vec[i].getDataRef() << "," << m_vec[i].getRef() << ")";
+            if(i > 0) oss << ",";
+            oss << m_vec[i];
         }
         oss << "]";
         return oss.str();
@@ -116,13 +116,15 @@ public:
 
     friend istream& operator>>(istream& is, Heap& h) {
         char ch;
-        if(!(is >> ch) || ch != '[') { is.clear(ios_base::failbit); return is; }
-        value_type val; Ref ref; char comma, close;
-        while(is >> ch && ch != ']')
-            if(ch == '(')
-                if(is >> val >> comma >> ref >> close)
-                    if(comma == ',' && close == ')')
-                        h.insert(val, ref);
+        if(!(is >> ch) || ch != '[') { is.setstate(ios_base::failbit); return is; }
+        if((is >> ws).peek() == ']') { is >> ch; return is; }
+        VectorNode<value_type> node;
+        while(is >> node) {
+            h.insert(node.getData(), node.getRef());
+            is >> ch;
+            if(ch == ']') break;
+            else if(ch != ',') { is.setstate(ios_base::failbit); break; }
+        }
         return is;
     }
 };
