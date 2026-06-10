@@ -192,9 +192,19 @@ ostream& operator<<(ostream& os, const Vector<Trait>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar
+// Lee el formato [(data,ref),(data,ref),...] y reconstruye con push_back
 template <typename Trait>
 istream& operator>>(istream& is, Vector<Trait>& v){
+    char ch;
+    if (!(is >> ch) || ch != '[') {
+        is.setstate(ios::failbit);
+        return is;
+    }
+    typename Vector<Trait>::value_type value; Ref ref; char comma, paren;
+    while (is >> ch && ch != ']')
+        if (ch == '(' && (is >> value >> comma >> ref >> paren) && comma == ',' && paren == ')')
+            v.push_back(value, ref);
+    is.ignore(numeric_limits<streamsize>::max(), '\n');
     return is;
 }
 

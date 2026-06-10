@@ -46,12 +46,7 @@ private:
     static size_t rightChild(size_t i) { return 2 * i + 2; }
 
     void swapNodes(size_t a, size_t b) {
-        Node& first  = m_vec[a];
-        Node& second = m_vec[b];
-        value_type data = first.getData();
-        Ref        ref  = first.getRef();
-        first.setData(second.getData());  first.setRef(second.getRef());
-        second.setData(data);             second.setRef(ref);
+        swap(m_vec[a],m_vec[b]);
     }
 
     // Sube el elemento hasta que su padre tenga mayor prioridad
@@ -125,15 +120,7 @@ public:
 
     string toString() {
         shared_lock<shared_mutex> lock(m_mtx);
-        ostringstream oss;
-        oss << "[";
-        size_t total = m_vec.size();
-        for (size_t i = 0; i < total; ++i) {
-            if (i > 0) oss << ",";
-            oss << "(" << m_vec[i].getData() << "," << m_vec[i].getRef() << ")";
-        }
-        oss << "]";
-        return oss.str();
+        return m_vec.toString();
     }
 
     friend ostream& operator<<(ostream& os, Heap& heap) {
@@ -141,13 +128,13 @@ public:
     }
 
     friend istream& operator>>(istream& is, Heap& heap) {
-        char ch;
-        if (!(is >> ch) || ch != '[') { is.setstate(ios::failbit); return is; }
-        value_type value; Ref ref; char comma, paren;
-        while (is >> ch && ch != ']')
-            if (ch == '(' && (is >> value >> comma >> ref >> paren) && comma == ',' && paren == ')')
-                heap.insert(value, ref);
-        is.ignore(numeric_limits<streamsize>::max(), '\n');
+        unique_lock<shared_mutex> lock(heap.m_mtx);
+        is >> heap.m_vec;
+        size_t n = heap.m_vec.size();
+        for (size_t i = n / 2; i > 0; ) {
+            --i;
+            heap.heapifyDown(i);
+        }
         return is;
     }
 };
