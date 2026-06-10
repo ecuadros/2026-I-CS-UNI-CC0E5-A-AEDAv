@@ -16,13 +16,7 @@
 using namespace std;
 
 template<typename Key, typename Value>
-struct HashEntry {
-    Key key;
-    Value value;
-
-    HashEntry() : key(), value() {}
-    HashEntry(const Key &k, const Value &v) : key(k), value(v) {}
-};
+using HashEntry = pair<Key, Value>;
 
 template<typename Key, typename Value>
 struct HashNode : public AVLNode<Key, HashNode<Key, Value>> {
@@ -36,7 +30,7 @@ struct HashNode : public AVLNode<Key, HashNode<Key, Value>> {
     HashNode(Key key, Value value, Ref ref = Ref{}) : Base(key, ref), entry(key, value) {}
 
     friend ostream& operator<<(ostream &os, const HashNode &node) {
-        return os << "(" << node.entry.key << "," << node.entry.value << ")";
+        return os << "(" << node.entry.first << "," << node.entry.second << ")";
     }
 };
 
@@ -79,7 +73,7 @@ protected:
             return nullptr;
         }
 
-        Node *newNode = new Node(pNode->entry.key, pNode->entry.value, pNode->m_ref);
+        Node *newNode = new Node(pNode->entry.first, pNode->entry.second, pNode->m_ref);
         newNode->m_height = pNode->m_height;
         newNode->m_pChild[0] = internal_copy(pNode->m_pChild[0]);
         newNode->m_pChild[1] = internal_copy(pNode->m_pChild[1]);
@@ -91,7 +85,7 @@ private:
         return this->internal_search(this->m_pRoot, key);
     }
 
-    void collect(Node *node, Vector<const Entry*> &items) const {
+    void collect(Node *node, RefVector<const Entry*> &items) const {
         if (!node) {
             return;
         }
@@ -110,7 +104,7 @@ private:
         if (!first) {
             oss << ",";
         }
-        oss << "(" << node->entry.key << "," << node->entry.value << ")";
+        oss << "(" << node->entry.first << "," << node->entry.second << ")";
         first = false;
         append(node->m_pChild[1], oss, first);
     }
@@ -120,14 +114,14 @@ public:
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node *found = findNodeUnlocked(key);
         if (found) {
-            found->entry.value = value;
+            found->entry.second = value;
             return false;
         }
 
         this->internal_insert(this->m_pRoot, key, ref);
         found = findNodeUnlocked(key);
         if (found) {
-            found->entry.value = value;
+            found->entry.second = value;
         }
         return true;
     }
@@ -137,12 +131,12 @@ public:
         Node *found = findNodeUnlocked(key);
         if (found) {
             inserted = false;
-            return found->entry.value;
+            return found->entry.second;
         }
 
         this->internal_insert(this->m_pRoot, key, Ref{});
         inserted = true;
-        return findNodeUnlocked(key)->entry.value;
+        return findNodeUnlocked(key)->entry.second;
     }
 
     Value at(const Key &key) const {
@@ -151,7 +145,7 @@ public:
         if (!found) {
             throw out_of_range("Clave no encontrada");
         }
-        return found->entry.value;
+        return found->entry.second;
     }
 
     bool containsKey(const Key &key) const {
@@ -159,7 +153,7 @@ public:
         return findNodeUnlocked(key) != nullptr;
     }
 
-    void collect(Vector<const Entry*> &items) const {
+    void collect(RefVector<const Entry*> &items) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
         collect(this->m_pRoot, items);
     }
@@ -189,11 +183,11 @@ public:
     using MySelf = HashTable<Key, Value, Hash>;
 
     class const_iterator {
-        Vector<const Entry*> m_items;
+        RefVector<const Entry*> m_items;
         size_t m_index = 0;
 
     public:
-        const_iterator(const Vector<const Entry*> &items, size_t index)
+        const_iterator(const RefVector<const Entry*> &items, size_t index)
             : m_items(items), m_index(index) {}
 
         const Entry& operator*() const {
@@ -229,7 +223,7 @@ private:
         return m_hash(key) % m_capacity;
     }
 
-    void collectEntries(Vector<const Entry*> &items) const {
+    void collectEntries(RefVector<const Entry*> &items) const {
         for (size_t i = 0; i < m_capacity; ++i) {
             m_buckets[i].collect(items);
         }
@@ -339,14 +333,14 @@ public:
 
     const_iterator begin() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        Vector<const Entry*> items(m_size + 1);
+        RefVector<const Entry*> items(m_size + 1);
         collectEntries(items);
         return const_iterator(items, 0);
     }
 
     const_iterator end() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        Vector<const Entry*> items(m_size + 1);
+        RefVector<const Entry*> items(m_size + 1);
         collectEntries(items);
         return const_iterator(items, items.size());
     }

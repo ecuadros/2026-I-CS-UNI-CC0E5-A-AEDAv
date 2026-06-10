@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
+#include "traits.h"
 #include "util.h"
 #include <mutex>
 #include <utility>
@@ -34,8 +35,13 @@ public:
 
 template <typename T>
 class VectorNode{
+public:
+    using value_type = T;
+
+private:
     T   m_data;
     Ref m_ref;
+
 public:
     VectorNode() : m_data(T()), m_ref(Ref()) {}
     VectorNode(T data, Ref ref) : m_data(data), m_ref(ref) {}
@@ -61,19 +67,19 @@ public:
 };
 
 template <typename T>
-ostream& operator<<(ostream& os, VectorNode<T>& node){
+ostream& operator<<(ostream& os, const VectorNode<T>& node){
     return os << "(" << node.getData() << ", " << node.getRef() << ")";
 }
 
-template <typename T>
+template <typename Trait>
 class Vector{
 public:
-    using  value_type = T;
-    using  forward_iterator   = vector_forward_iterator < Vector<T> > ;
+    using  value_type         = typename Trait::value_type;
+    using  forward_iterator   = vector_forward_iterator < Vector<Trait> > ;
     friend forward_iterator;
-    using  backward_iterator  = vector_backward_iterator< Vector<T> > ;
+    using  backward_iterator  = vector_backward_iterator< Vector<Trait> > ;
     friend backward_iterator;
-    using  Node               = VectorNode<T>;
+    using  Node               = typename Trait::Node;
 private:
     size_t  m_capacity;
     size_t  m_size;
@@ -120,15 +126,15 @@ public:
     }
 };
 
-template <typename T>
-Vector<T>::Vector(size_t capacity){
+template <typename Trait>
+Vector<Trait>::Vector(size_t capacity){
     m_capacity = capacity;
     m_size = 0;
     m_data = new Node[capacity];
 }
 
-template <typename T>
-Vector<T>::Vector(const Vector &other){
+template <typename Trait>
+Vector<Trait>::Vector(const Vector &other){
     shared_lock<shared_mutex> lock(other.m_mtx);
     m_capacity = other.m_capacity;
     m_size = other.m_size;
@@ -137,16 +143,16 @@ Vector<T>::Vector(const Vector &other){
         m_data[i] = other.m_data[i];
 }
 
-template <typename T>
-Vector<T>::Vector(Vector &&other){
+template <typename Trait>
+Vector<Trait>::Vector(Vector &&other){
     unique_lock<shared_mutex> lock(other.m_mtx);
     m_capacity = std::exchange(other.m_capacity, 0);
     m_size = std::exchange(other.m_size, 0);
     m_data = std::exchange(other.m_data, nullptr);
 }
 
-template <typename T>
-Vector<T>& Vector<T>::operator=(const Vector &other){
+template <typename Trait>
+Vector<Trait>& Vector<Trait>::operator=(const Vector &other){
     if(this != &other){
         unique_lock<shared_mutex> lock(m_mtx);
         shared_lock<shared_mutex> otherLock(other.m_mtx);
@@ -161,8 +167,8 @@ Vector<T>& Vector<T>::operator=(const Vector &other){
     return *this;
 }
 
-template <typename T>
-Vector<T>& Vector<T>::operator=(Vector &&other){
+template <typename Trait>
+Vector<Trait>& Vector<Trait>::operator=(Vector &&other){
     if(this != &other){
         unique_lock<shared_mutex> lock(m_mtx);
         unique_lock<shared_mutex> otherLock(other.m_mtx);
@@ -174,13 +180,13 @@ Vector<T>& Vector<T>::operator=(Vector &&other){
     return *this;
 }
 
-template <typename T>
-Vector<T>::~Vector(){
+template <typename Trait>
+Vector<Trait>::~Vector(){
     delete [] m_data;
 }
 
-template <typename T>
-void Vector<T>::resize(){
+template <typename Trait>
+void Vector<Trait>::resize(){
     m_capacity = (m_capacity < 10) ? m_capacity+10 : m_capacity * 2;
     Node * new_data = new Node[m_capacity];
     for(size_t i = 0; i < m_size; ++i)
@@ -189,70 +195,70 @@ void Vector<T>::resize(){
     m_data = new_data;
 }
 
-template <typename T>
-void Vector<T>::push_back(value_type value, Ref ref){
+template <typename Trait>
+void Vector<Trait>::push_back(value_type value, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx);
     if(m_size == m_capacity) // Overflow
         resize();
     m_data[m_size++] = Node(value, ref);
 }
 
-template <typename T>
-void Vector<T>::pop_back(){
+template <typename Trait>
+void Vector<Trait>::pop_back(){
     unique_lock<shared_mutex> lock(m_mtx);
     if(m_size == 0)
         throw out_of_range("Vector vacio");
     --m_size;
 }
 
-template <typename T>
-size_t Vector<T>::size() const{
+template <typename Trait>
+size_t Vector<Trait>::size() const{
     shared_lock<shared_mutex> lock(m_mtx);
     return m_size;
 }
 
-template <typename T>
-typename Vector<T>::value_type& Vector<T>::operator[](size_t index){
+template <typename Trait>
+typename Vector<Trait>::value_type& Vector<Trait>::operator[](size_t index){
     shared_lock<shared_mutex> lock(m_mtx);
     if(index >= m_size)
         throw out_of_range("Indice fuera de rango");
     return m_data[index].getDataRef();
 }
 
-template <typename T>
-const typename Vector<T>::value_type& Vector<T>::operator[](size_t index) const{
+template <typename Trait>
+const typename Vector<Trait>::value_type& Vector<Trait>::operator[](size_t index) const{
     shared_lock<shared_mutex> lock(m_mtx);
     if(index >= m_size)
         throw out_of_range("Indice fuera de rango");
     return m_data[index].getDataRef();
 }
 
-template <typename T>
-Ref Vector<T>::getRef(size_t index) const{
+template <typename Trait>
+Ref Vector<Trait>::getRef(size_t index) const{
     shared_lock<shared_mutex> lock(m_mtx);
     if(index >= m_size)
         throw out_of_range("Indice fuera de rango");
     return m_data[index].getRef();
 }
 
-template <typename T>
-void Vector<T>::setRef(size_t index, Ref ref){
+template <typename Trait>
+void Vector<Trait>::setRef(size_t index, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx);
     if(index >= m_size)
         throw out_of_range("Indice fuera de rango");
     m_data[index].setRef(ref);
 }
 
-template <typename T>
-void Vector<T>::swap(size_t a, size_t b){
+template <typename Trait>
+void Vector<Trait>::swap(size_t a, size_t b){
     unique_lock<shared_mutex> lock(m_mtx);
     if(a >= m_size || b >= m_size)
         throw out_of_range("Indice fuera de rango");
     std::swap(m_data[a], m_data[b]);
 }
 
-template <typename T>
-string Vector<T>::toString() const{
+template <typename Trait>
+string Vector<Trait>::toString() const{
     shared_lock<shared_mutex> lock(m_mtx);
     ostringstream oss;
     oss << "[";
@@ -266,13 +272,33 @@ string Vector<T>::toString() const{
 }
 
 template <typename T>
-ostream& operator<<(ostream& os, const Vector<T>& v){
+using RefVector = Vector<NodeTrait<VectorNode<T>>>;
+
+template <typename Trait>
+ostream& operator<<(ostream& os, const Vector<Trait>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar
-template <typename T>
-istream& operator>>(istream& is, Vector<T>& v){
+template <typename Trait>
+istream& operator>>(istream& is, Vector<Trait>& v){
+    char ch;
+    if (!(is >> ch) || ch != '[') {
+        is.clear(ios_base::failbit);
+        return is;
+    }
+
+    typename Vector<Trait>::value_type value;
+    Ref ref;
+    char comma;
+    char closeParen;
+
+    while (is >> ch && ch != ']') {
+        if (ch == '(' && is >> value >> comma >> ref >> closeParen) {
+            if (comma == ',' && closeParen == ')') {
+                v.push_back(value, ref);
+            }
+        }
+    }
     return is;
 }
 

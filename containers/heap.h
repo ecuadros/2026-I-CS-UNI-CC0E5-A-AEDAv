@@ -12,30 +12,28 @@
 #include <tuple>
 #include <utility>
 #include "../types.h"
+#include "traits.h"
 #include "vector.h"
 using namespace std;
 
 template <typename T>
-struct MinHeapTrait {
-    using value_type = T;
-    using Comp = less<T>;
+struct MinHeapTrait : public BaseTrait<VectorNode<T>, less<T>> {
 };
 
 template <typename T>
-struct MaxHeapTrait {
-    using value_type = T;
-    using Comp = greater<T>;
+struct MaxHeapTrait : public BaseTrait<VectorNode<T>, greater<T>> {
 };
 
 template<typename Trait>
 class Heap {
 public:
     using value_type = typename Trait::value_type;
+    using Node       = typename Trait::Node;
     using Comp       = typename Trait::Comp;
     using MySelf     = Heap<Trait>;
 
 private:
-    Vector<value_type>   m_vec;
+    Vector<Trait>        m_vec;
     Comp                 m_comp;
     mutable shared_mutex m_mtx;
 

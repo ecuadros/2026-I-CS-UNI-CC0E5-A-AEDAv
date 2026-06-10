@@ -2,6 +2,12 @@
 #define __TRAITS_H__
 #include <functional>
 
+template <typename _Node>
+struct NodeTrait{
+    using Node       = _Node;
+    using value_type = typename _Node::value_type;
+};
+
 template <typename _Node, typename _Comp>
 struct BaseTrait{
     using Node       = _Node;
