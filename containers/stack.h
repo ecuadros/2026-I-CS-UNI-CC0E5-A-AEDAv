@@ -3,12 +3,15 @@
 
 #include <stdexcept>
 #include <shared_mutex>
+#include "traits.h"
 #include "vector.h"
 using namespace std;
 
 template<typename T>
 class Stack {
-    Vector<T>            m_vec;
+private:
+    using InternalVectorTrait = AscendingVectorTrait<T>;
+    Vector<InternalVectorTrait> m_vec;
     mutable shared_mutex m_mtx;
 public:
     Stack(size_t capacity = 64) : m_vec(capacity) {}
@@ -22,7 +25,7 @@ public:
     // move constructor
     Stack(Stack&& other) : m_vec(0) {
         unique_lock<shared_mutex> lock(other.m_mtx);
-        this->m_vec = exchange(other.m_vec, Vector<T>(0));
+        this->m_vec = exchange(other.m_vec, Vector<InternalVectorTrait>(0));
     }
 
     // copy assignment
@@ -30,7 +33,7 @@ public:
         if (this != &other) {
             unique_lock<shared_mutex> lock(m_mtx);
             shared_lock<shared_mutex> olock(other.m_mtx);
-            this->m_vec = Vector<T>(other.m_vec.size() + 64);
+            this->m_vec = Vector<InternalVectorTrait>(other.m_vec.size() + 64);
             for (size_t i = 0; i < other.m_vec.size(); ++i)
                 this->m_vec.push_back(other.m_vec[i], 0);
         }
@@ -42,7 +45,7 @@ public:
         if (this != &other) {
             unique_lock<shared_mutex> lock(m_mtx);
             unique_lock<shared_mutex> olock(other.m_mtx);
-            this->m_vec = exchange(other.m_vec, Vector<T>(0));
+            this->m_vec = exchange(other.m_vec, Vector<InternalVectorTrait>(0));
         }
         return *this;
     }

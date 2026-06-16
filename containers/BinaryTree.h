@@ -122,6 +122,8 @@ public:
     using InorderView = TraversalView<Node, value_type>;
     using PreorderView = TraversalView<Node, value_type>;
     using PostorderView = TraversalView<Node, value_type>;
+    using ResultTuple = tuple<value_type, Ref>;
+    using VectorTupleTrait = AscendingVectorTrait<ResultTuple>;
 
 protected:
     Node *m_root;
@@ -179,7 +181,7 @@ protected:
 
     // mejora 2 : dfs_search
     void dfs_search(Node* node, std::function<bool(const value_type&)> pred,
-                    Vector<tuple<value_type, Ref>>& results) const {
+                    Vector<VectorTupleTrait>& results) const {
         if (!node) return;
         
         // Visita en preorder
@@ -307,9 +309,9 @@ public:
     }
 
     // mejora 2: searchAll
-    Vector<tuple<value_type, Ref>> searchAll(std::function<bool(const value_type&)> pred) const {
+    Vector<VectorTupleTrait> searchAll(std::function<bool(const value_type&)> pred) const {
         shared_lock<shared_mutex> lock(m_lock);
-        Vector<tuple<value_type, Ref>> results(64);
+        Vector<VectorTupleTrait> results(64);
         dfs_search(m_root, pred, results);
         return results;
     }

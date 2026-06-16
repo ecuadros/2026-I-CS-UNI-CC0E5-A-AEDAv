@@ -5,10 +5,12 @@
 #include <cstddef> // size_t
 #include <string>
 #include <sstream>
+#include <utility>
 #include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
 #include "util.h"
 #include <mutex>
+#include "traits.h"
 #include "../types.h"
 using namespace std;
 
@@ -72,15 +74,23 @@ ostream& operator<<(ostream& os, VectorNode<T>& node){
     return os << "(" << node.getData() << ", " << node.getRef() << ")";
 }
 
-template <typename T>
+template<typename T>
+struct AscendingVectorTrait : public BaseTrait<VectorNode<T>, std::less<T>> {};
+
+template<typename T>
+struct DescendingVectorTrait : public BaseTrait<VectorNode<T>, std::greater<T>> {};
+
+template <typename Trait>
 class Vector{
 public:
-    using  value_type = T;
-    using  forward_iterator   = vector_forward_iterator < Vector<T> > ;
+    using value_type        = typename Trait::value_type;
+    using Node              = typename Trait::Node;
+    using Comp              = typename Trait::Comp; 
+    
+    using forward_iterator  = vector_forward_iterator < Vector<Trait> > ;
     friend forward_iterator;
-    using  backward_iterator  = vector_backward_iterator< Vector<T> > ;
+    using backward_iterator = vector_backward_iterator< Vector<Trait> > ;
     friend backward_iterator;
-    using  Node               = VectorNode<T>;
 private:
     size_t  m_capacity;
     size_t  m_size;
@@ -168,20 +178,20 @@ public:
 
 };
 
-template <typename T>
-Vector<T>::Vector(size_t capacity){
+template <typename Trait>
+Vector<Trait>::Vector(size_t capacity){
     m_capacity = capacity;
     m_size = 0;
     m_data = new Node[capacity];
 }
 
-template <typename T>
-Vector<T>::~Vector(){
+template <typename Trait>
+Vector<Trait>::~Vector(){
     delete [] m_data;
 }
 
-template <typename T>
-void Vector<T>::resize(){
+template <typename Trait>
+void Vector<Trait>::resize(){
     m_capacity = (m_capacity < 10) ? m_capacity+10 : m_capacity * 2;
     Node * new_data = new Node[m_capacity];
     for(size_t i = 0; i < m_size; ++i)
@@ -190,21 +200,21 @@ void Vector<T>::resize(){
     m_data = new_data;
 }
 
-template <typename T>
-void Vector<T>::push_back(value_type value, Ref ref){
+template <typename Trait>
+void Vector<Trait>::push_back(value_type value, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx);
     if(m_size == m_capacity) resize();
     m_data[m_size++] = Node(value, ref);
 }
 
-template <typename T>
-size_t Vector<T>::size() const{
+template <typename Trait>
+size_t Vector<Trait>::size() const{
     shared_lock<shared_mutex> lock(m_mtx);
     return m_size;
 }
 
-template <typename T>
-string Vector<T>::toString() const{
+template <typename Trait>
+string Vector<Trait>::toString() const{
     shared_lock<shared_mutex> lock(m_mtx);
     ostringstream oss;
     oss << "[";
@@ -216,35 +226,35 @@ string Vector<T>::toString() const{
     return oss.str();
 }
 
-template <typename T>
-typename Vector<T>::Node Vector<T>::getNode(size_t index) const {
+template <typename Trait>
+typename Vector<Trait>::Node Vector<Trait>::getNode(size_t index) const {
     shared_lock<shared_mutex> lock(m_mtx);
     if (index >= m_size) throw out_of_range("Indice fuera de rango");
     return m_data[index]; 
 }
 
-template <typename T>
-void Vector<T>::swapNodes(size_t i, size_t j) {
+template <typename Trait>
+void Vector<Trait>::swapNodes(size_t i, size_t j) {
     unique_lock<shared_mutex> lock(m_mtx);
     if (i >= m_size || j >= m_size) throw out_of_range("Indice fuera de rango");
     std::swap(m_data[i], m_data[j]);
 }
 
-template <typename T>
-void Vector<T>::pop_back() {
+template <typename Trait>
+void Vector<Trait>::pop_back() {
     unique_lock<shared_mutex> lock(m_mtx);
     if (m_size > 0) m_size--;
 }
 
 // ---------------------------------------------
 
-template <typename T>
-ostream& operator<<(ostream& os, const Vector<T>& v){
+template <typename Trait>
+ostream& operator<<(ostream& os, const Vector<Trait>& v){
     return os << v.toString();
 }
 
-template <typename T>
-istream& operator>>(istream& is, Vector<T>& v){
+template <typename Trait>
+istream& operator>>(istream& is, Vector<Trait>& v){
     return is;
 }
 

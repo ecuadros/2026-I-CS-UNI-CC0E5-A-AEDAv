@@ -54,7 +54,7 @@ void DemoHashTable() {
         cout << "   [Error] No se pudo crear el archivo.\n";
     }
 
-    // 6.2 Leer desde el archivo >>
+    // 7. Leer desde el archivo >>
     HashTable<string, T1> inventario_importado;
     ifstream inFile(filename);
     if (inFile.is_open()) {

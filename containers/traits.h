@@ -10,10 +10,10 @@ struct BaseTrait{
 };
 
 template <typename _Node>
-struct AscendingTrait : public BaseTrait<_Node, less<typename _Node::value_type>>{
+struct AscendingTrait : public BaseTrait<_Node, std::less<typename _Node::value_type>>{
 };
 template <typename _Node>
-struct DescendingTrait : public BaseTrait<_Node, greater<typename _Node::value_type>>{
+struct DescendingTrait : public BaseTrait<_Node, std::greater<typename _Node::value_type>>{
 };
 
 #endif // __TRAITS_H__

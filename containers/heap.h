@@ -34,7 +34,7 @@ public:
     using MySelf     = Heap<Trait>;
     
 private:
-    Vector<value_type> m_vec;
+    Vector<Trait> m_vec;
     Comp               m_comp;
     mutable shared_mutex m_mtx;
 
@@ -45,7 +45,7 @@ private:
 public:
     // Constructor
     Heap() : m_vec(), m_comp() {}
-    Heap(const Vector<value_type>& vec) : m_vec(vec), m_comp() {
+    Heap(const Vector<Trait>& vec) : m_vec(vec), m_comp() {
         if (m_vec.size() > 0) {
             for (size_t i = parent(m_vec.size() - 1); i > 0; --i) {
                 heapifyDown(i - 1);
