@@ -344,6 +344,22 @@ public:
         internal_insert(m_pRoot, data, ref);
     }
 
+    // find-or-insert: devuelve el ref de la clave, insertandola con Ref() si no existe.
+    Ref& operator[](const value_type& key) {
+        unique_lock<shared_mutex> lock(m_mtx);
+        Node* n = find_node(key);
+        if (!n) {
+            internal_insert(m_pRoot, key, Ref());
+            n = find_node(key);
+        }
+        return n->m_ref;
+    }
+
+    bool contains(const value_type& key) const {
+        shared_lock<shared_mutex> lock(m_mtx);
+        return find_node(key) != nullptr;
+    }
+
     size_t size()   const { shared_lock<shared_mutex> lock(m_mtx); return m_size; }
     size_t height() const { shared_lock<shared_mutex> lock(m_mtx); return height_r(m_pRoot); }
 

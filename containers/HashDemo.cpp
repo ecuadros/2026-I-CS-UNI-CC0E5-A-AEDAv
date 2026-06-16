@@ -7,41 +7,54 @@
 using namespace std;
 
 void DemoHashTable() {
-    cout << "--- HashTable (sobre AVL) ---" << endl;
+    cout << "--- HashTable (funcion hash + colisiones resueltas con AVL) ---" << endl;
 
-    HashTable<AscendingAVLTrait<T1>> tabla;
-    tabla[5] = 3;
-    tabla[2] = 20;
-    tabla[8] = 80;
-    tabla[1] = 10;
-    tabla[5] = 33;   // la clave ya existe, se actualiza
+    HashTable<AscendingHashTrait<T1>> tabla(4);
+    tabla[5]  = 50;
+    tabla[2]  = 20;
+    tabla[8]  = 80;
+    tabla[1]  = 10;
+    tabla[9]  = 90;
+    tabla[13] = 130;
+    tabla[5]  = 55;
 
-    cout << "tabla[5] = " << tabla[5] << endl;
-    cout << "size     = " << tabla.size() << ", height = " << tabla.height() << endl;
+    cout << "tabla[5]   = " << tabla[5] << endl;
+    cout << "size       = " << tabla.size()
+         << ", cubetas = " << tabla.bucketCount()
+         << ", carga = "    << tabla.loadFactor() << endl;
 
-    cout << "recorrido: ";
+    cout << "reparto por la funcion hash:" << endl;
+    for (T1 k : {5, 2, 8, 1, 9, 13})
+        cout << "  hash(" << k << ") -> cubeta " << tabla.indexFor(k) << endl;
+
+    cout << "contenido de cada cubeta (cada una es un AVL):" << endl;
+    for (size_t i = 0; i < tabla.bucketCount(); ++i)
+        cout << "  cubeta[" << i << "] = " << tabla.bucketToString(i) << endl;
+
+    cout << "recorrido  : ";
     for (const auto& [clave, valor] : tabla)
         cout << clave << "=" << valor << " ";
     cout << endl;
 
-    cout << "serializa: " << tabla << endl;
+    cout << "contains(9)  = " << tabla.contains(9)
+         << ", contains(7) = " << tabla.contains(7) << endl;
 
-    // Guardar y volver a leer desde archivo
+    cout << "serializa  : " << tabla << endl;
+
     ofstream salida("temp.txt");
     salida << tabla << endl;
     salida.close();
 
-    HashTable<AscendingAVLTrait<T1>> leida;
+    HashTable<AscendingHashTrait<T1>> leida(4);
     ifstream entrada("temp.txt");
     entrada >> leida;
     entrada.close();
-    cout << "leida    : " << leida << endl;
+    cout << "leida      : " << leida << endl;
 
-    // La copia es independiente del original
-    HashTable<AscendingAVLTrait<T1>> copia(tabla);
+    HashTable<AscendingHashTrait<T1>> copia(tabla);
     copia[5] = 999;
     cout << "original tabla[5] = " << tabla[5] << ", copia[5] = " << copia[5] << endl;
 
-    HashTable<AscendingAVLTrait<T1>> movida(move(leida));
-    cout << "movida   : " << movida << endl;
+    HashTable<AscendingHashTrait<T1>> movida(move(leida));
+    cout << "movida     : " << movida << endl;
 }
