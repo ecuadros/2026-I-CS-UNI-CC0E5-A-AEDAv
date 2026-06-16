@@ -42,3 +42,6 @@
 *.tmp
 main
 temp.txt
+
+# macOS
+.DS_Store
