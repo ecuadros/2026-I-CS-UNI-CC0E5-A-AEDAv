@@ -29,7 +29,7 @@ struct KVPair {
     bool operator==(const KVPair& o) const { return m_key == o.m_key; }
 
     friend ostream& operator<<(ostream& os, const KVPair& p) { return os << p.m_key << ": " << p.m_value; }
-    friend istream& operator>>(istream& is, KVPair& p) { char c; return is >> p.m_key >> c >> p.m_value; }
+    friend istream& operator>>(istream& is, KVPair& p) { Token c; return is >> p.m_key >> c >> p.m_value; }
 };
 
 // ─── tuple para [key, value] ─────────────────────────────────────────────────
@@ -44,7 +44,7 @@ namespace std {
 }
 template<size_t I, typename K, typename V>
 decltype(auto) get(KVPair<K, V>& p) {
-    if constexpr(I == 0) return (const K&)p.m_key;   // la key va const, no se debe cambiar
+    if constexpr(I == 0) return (const K&)p.m_key;
     else                 return (V&)p.m_value;
 }
 template<size_t I, typename K, typename V>
@@ -64,7 +64,7 @@ public:
     using value_type = Pair;
 
 private:
-    // busca el nodo de una key (sin lock, lo pone el que llama)
+    // corre bajo el lock del método público (operator[]/at)
     Node* find_node(const Key& key) const {
         Pair probe(key);
         Node* n = this->m_pRoot;
@@ -87,13 +87,13 @@ public:
             this->internal_insert(this->m_pRoot, p, Ref{}, nullptr);
     }
 
-    // si la key existe devuelve su valor; si no, la crea
+    // si la key existe devuelve su valor. si no, la crea
     Value& operator[](const Key& key) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node* n = find_node(key);
         if(!n) {
             this->internal_insert(this->m_pRoot, Pair(key), Ref{}, nullptr);
-            n = find_node(key);                  // la rotacion pudo moverlo
+            n = find_node(key);
         }
         return n->m_data.m_value;
     }
@@ -133,14 +133,12 @@ public:
 
     // lee {k: v, ...} y arma el mapa
     friend istream& operator>>(istream& is, HashTable& m) {
-        char ch;
+        Token ch;
         if(!(is >> ch) || ch != '{') { is.clear(ios_base::failbit); return is; }
-        while(is >> ch && ch != '}') {
-            if(ch == ',') continue;
-            is.putback(ch);
-            Key key; char colon;
+        while((is >> ws).peek() != '}') {            // mira el '}' sin consumirlo
+            Key key; Token colon;
             if(!(is >> key >> colon) || colon != ':') break;
-            string raw; char c;
+            string raw; Token c = '\0';
             while(is.get(c) && c != ',' && c != '}') raw += c;   // lee el valor hasta , o }
             size_t a = raw.find_first_not_of(" \t");
             size_t b = raw.find_last_not_of(" \t");
@@ -148,8 +146,9 @@ public:
             Value val{};
             istringstream iss(raw); iss >> val;
             m[key] = val;
-            if(c == '}') break;
+            if(c == '}') return is;                  // el valor ya consumió el '}'
         }
+        is >> ch;                                    // consume el '}' (caso vacío)
         return is;
     }
 };
