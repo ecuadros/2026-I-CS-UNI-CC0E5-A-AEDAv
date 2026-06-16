@@ -2,14 +2,14 @@
 #include "containers/heap.h"
 // g++ -std=c++2b main.cpp containers/vector.cpp -o main
 void HeapDemo();
-void DemoHashTable();
+void DemoHashAVL();
 
 int main(){
     // DemoVector();
     //DemoConcurrentVector();
     //ListsDemo();
     HeapDemo();
-    DemoHashTable();
+    DemoHashAVL();
 
     return 0;
 }

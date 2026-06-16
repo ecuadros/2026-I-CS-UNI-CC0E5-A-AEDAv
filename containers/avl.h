@@ -2,7 +2,7 @@
 #define __AVL_H__
 
 #include "binarytree.h"
-
+#include "../types.h"
 //AVLNode
 template<typename T>
 struct AVLNode : BinaryTreeNode<T, AVLNode<T>> {
@@ -11,9 +11,14 @@ struct AVLNode : BinaryTreeNode<T, AVLNode<T>> {
 };
 template<typename Trait>
 class AVL : public BinaryTree<Trait> {
+
 public:
     using value_type = typename Trait::value_type;
     using Node       = typename Trait::Node;
+    BinaryTreeNode<value_type, Node>* root() const {
+            return this->m_pRoot;
+    }
+
 private:
     //altura nodo
     size_t  height(Node* n) const {
@@ -25,8 +30,11 @@ private:
         if (!n) return;
         n->m_height = 1 + max(height(n->m_pChild[0]), height(n->m_pChild[1]));
     }
+
+
+
     //factorr balance
-    size_t  balance_factor(Node* n) const {
+    T1  balance_factor(Node* n) const {
         if (!n) return 0;
         return height(n->m_pChild[0]) - height(n->m_pChild[1]);
     }
@@ -53,7 +61,7 @@ private:
     //rebalanceeo
     void rebalance(Node* &n) {
         update_height(n);
-        size_t  bf = balance_factor(n);
+        T1  bf = balance_factor(n);
         //desbalance izq-izq
         if (bf > 1 && balance_factor(n->m_pChild[0]) >= 0) rotate_right(n);
         //desbalance izq-der
@@ -104,7 +112,7 @@ public:
         return height(this->m_pRoot);
     }
     //factor balance arbol
-    size_t balance() const {
+    T1 balance() const {
         shared_lock<shared_mutex> lock(this->m_mtx);
         return balance_factor(this->m_pRoot);
     }

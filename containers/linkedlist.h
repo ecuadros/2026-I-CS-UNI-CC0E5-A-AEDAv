@@ -35,13 +35,15 @@ public:
 // Linked List Node
 template <typename T>
 class LLNode{
-protected:
-    using Node = NodeType;
+public:
+    using value_type = T;
+    using Node = LLNode<T>;
 private:
     T   m_data;
     Ref m_ref;
     Node *m_next;
 public:
+
     LLNode() : m_data(T()), m_ref(Ref()), m_next(nullptr) {}
     LLNode(T data, Ref ref) : m_data(data), m_ref(ref), m_next(nullptr) {}
     LLNode(T data, Ref ref, Node *next) : m_data(data), m_ref(ref), m_next(next) {}
@@ -52,7 +54,7 @@ public:
     void   setData(T data) { m_data = data; }
     Ref    getRef() const  { return m_ref; }
     void   setRef(Ref ref) { m_ref = ref; }
-    Node*  ngetNext() const { return m_next; }
+    Node*   getNext() const { return m_next; }
     Node*& getNextRef()    { return m_next; }
     void   setNext(Node *next) { m_next = next; }
 };
