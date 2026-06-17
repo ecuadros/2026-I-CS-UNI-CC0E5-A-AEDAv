@@ -33,7 +33,7 @@ public:
     using Comp       = typename Trait::Comp;// tipo de comparador para mantener el orden del heap
     using Node       = typename Trait::Node;// tipo de nodo del heap       
     using MySelf     = Heap<Trait>;
-
+    
 private:
     Vector<Trait>        m_vec;// vector que almacena los nodos del heap
     mutable shared_mutex m_mtx;// mutex para control de concurrencia

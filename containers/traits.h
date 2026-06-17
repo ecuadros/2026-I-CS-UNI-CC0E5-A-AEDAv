@@ -16,4 +16,10 @@ template <typename _Node>
 struct DescendingTrait : public BaseTrait<_Node, greater<typename _Node::value_type>>{
 };
 
+template <typename _Key, typename _Value>
+struct KeyValueTrait {
+    using Value = _Value;
+    using Key   = _Key;
+}; 
+
 #endif // __TRAITS_H__

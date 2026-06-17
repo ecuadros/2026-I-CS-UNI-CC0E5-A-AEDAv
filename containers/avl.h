@@ -5,7 +5,7 @@
 #include "../types.h"
 //AVLNode
 template<typename T>
-struct AVLNode : BinaryTreeNode<T, AVLNode<T>> {
+struct AVLNode : BinaryTreeNode<T, AVLNode<T>> {//CRTP
     size_t m_height;
     AVLNode(T data, Ref ref): BinaryTreeNode<T, AVLNode<T>>(data, ref), m_height(1) {}
 };
@@ -39,7 +39,7 @@ private:
         return height(n->m_pChild[0]) - height(n->m_pChild[1]);
     }
     //rotar derecha
-    void rotate_right(Node* &y) {
+    void rotate_right(Node* &y) {//CAMBIAR
         Node* x   = y->m_pChild[0];
         Node* B   = x->m_pChild[1];
         x->m_pChild[1] = y;
@@ -49,7 +49,7 @@ private:
         y = x;
     }
     //rotar izquierda
-    void rotate_left(Node* &x) {
+    void rotate_left(Node* &x) {//CAMBIAR
         Node* y   = x->m_pChild[1];
         Node* B   = y->m_pChild[0];
         y->m_pChild[0] = x;
