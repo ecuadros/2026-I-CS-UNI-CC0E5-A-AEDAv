@@ -4,69 +4,134 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <tuple>
-#include <utility>
+#include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <stdexcept>
 #include <shared_mutex>
 #include <mutex>
+#include <utility>
 #include "../types.h"
 #include "avl.h"
+#include "linkedlist.h"
 using namespace std;
 
-// ─── KVPair<Key, Value> ──────────────────────────────────────────────────────
-// par (key, value). el arbol se ordena por la key
+// HashEntry<Key, Value>
+// entrada (key, value) de la cadena de colisiones. "key: value"
 template<typename Key, typename Value>
-struct KVPair {
+struct HashEntry {
     Key   m_key;
     Value m_value;
 
-    KVPair() : m_key(), m_value() {}
-    KVPair(const Key& k, const Value& v = Value{}) : m_key(k), m_value(v) {}
+    HashEntry() : m_key(), m_value() {}
+    HashEntry(const Key& k, const Value& v = Value{}) : m_key(k), m_value(v) {}
 
-    bool operator<(const KVPair& o)  const { return m_key <  o.m_key; }
-    bool operator>(const KVPair& o)  const { return m_key >  o.m_key; }
-    bool operator==(const KVPair& o) const { return m_key == o.m_key; }
+    bool operator<(const HashEntry& o)  const { return m_key <  o.m_key; }
+    bool operator>(const HashEntry& o)  const { return m_key >  o.m_key; }
+    bool operator==(const HashEntry& o) const { return m_key == o.m_key; }
 
-    friend ostream& operator<<(ostream& os, const KVPair& p) { return os << p.m_key << ": " << p.m_value; }
-    friend istream& operator>>(istream& is, KVPair& p) { Token c; return is >> p.m_key >> c >> p.m_value; }
+    friend ostream& operator<<(ostream& os, const HashEntry& e) { return os << e.m_key << ": " << e.m_value; }
 };
 
-// ─── tuple para [key, value] ─────────────────────────────────────────────────
-// para poder hacer: for (const auto& [k, v] : m)
-namespace std {
-    template<typename K, typename V>
-    struct tuple_size<::KVPair<K, V>> : integral_constant<size_t, 2> {};
-    template<typename K, typename V>
-    struct tuple_element<0, ::KVPair<K, V>> { using type = const K; };
-    template<typename K, typename V>
-    struct tuple_element<1, ::KVPair<K, V>> { using type = V; };
-}
-template<size_t I, typename K, typename V>
-decltype(auto) get(KVPair<K, V>& p) {
-    if constexpr(I == 0) return (const K&)p.m_key;
-    else                 return (V&)p.m_value;
-}
-template<size_t I, typename K, typename V>
-decltype(auto) get(const KVPair<K, V>& p) {
-    if constexpr(I == 0) return (const K&)p.m_key;
-    else                 return (const V&)p.m_value;
-}
-
-// ─── HashTable<Key, Value> ───────────────────────────────────────────────────
-// mapa sobre AVL: reusa el balanceo y la concurrencia del arbol
+// trait de la cadena de colisiones (LinkedList por bucket)
 template<typename Key, typename Value>
-class HashTable : public AVL<AscendingAVLTrait<KVPair<Key, Value>>> {
+struct HashChainTrait : BaseTrait<LLNode<HashEntry<Key, Value>>, less<HashEntry<Key, Value>>> {};
+
+// HashBucket<Key, Value>
+// dato de cada nodo del AVL: hash + cadena de colisiones
+template<typename Key, typename Value>
+struct HashBucket {
+    size_t m_hash;
+    LinkedList<HashChainTrait<Key, Value>> m_chain;
+
+    HashBucket() : m_hash(0) {}
+    HashBucket(size_t h) : m_hash(h) {}
+
+    bool operator<(const HashBucket& o)  const { return m_hash <  o.m_hash; }
+    bool operator>(const HashBucket& o)  const { return m_hash >  o.m_hash; }
+    bool operator==(const HashBucket& o) const { return m_hash == o.m_hash; }
+
+    // el bucket imprime su cadena (reusa operator<< de LinkedList)
+    friend ostream& operator<<(ostream& os, const HashBucket& b) { return os << b.m_chain; }
+};
+
+// HashTrait
+// reusa AscendingAVLTrait + agrega los tipos del hash. H = funcion hash
+template<typename Key, typename Value, typename H = hash<Key>>
+struct HashTrait : AscendingAVLTrait<HashBucket<Key, Value>> {
+    using key_type    = Key;
+    using mapped_type = Value;
+    using Entry       = HashEntry<Key, Value>;
+    using Hasher      = H;
+};
+
+// HashIterator
+// inorder del AVL (buckets) + el del LinkedList (cadena del bucket)
+template<typename Trait>
+class HashIterator {
 public:
-    using Pair       = KVPair<Key, Value>;
-    using Base       = AVL<AscendingAVLTrait<Pair>>;
-    using Node       = typename Base::Node;
-    using value_type = Pair;
+    using Bucket   = typename Trait::value_type;
+    using Entry    = typename Trait::Entry;
+    using BucketIt = typename BinaryTree<Trait>::inorder_fwd;
+    using Chain    = LinkedList<HashChainTrait<typename Trait::key_type, typename Trait::mapped_type>>;
+    using ChainIt  = typename Chain::forward_iterator;
 
 private:
-    // corre bajo el lock del método público (operator[]/at)
-    Node* find_node(const Key& key) const {
-        Pair probe(key);
+    BucketIt m_bIt, m_bEnd;
+    ChainIt  m_cIt, m_cEnd;
+
+    // si la cadena actual se agoto, salta al siguiente bucket
+    void skipEmpty() {
+        while(m_bIt != m_bEnd && m_cIt == m_cEnd) {
+            ++m_bIt;
+            if(m_bIt != m_bEnd) {
+                ChainIt b = (*m_bIt).m_chain.begin();
+                ChainIt e = (*m_bIt).m_chain.end();
+                m_cIt = b; m_cEnd = e;
+            }
+        }
+    }
+
+public:
+    HashIterator(BucketIt b, BucketIt e)
+        : m_bIt(b), m_bEnd(e), m_cIt(nullptr, nullptr), m_cEnd(nullptr, nullptr) {
+        if(m_bIt != m_bEnd) {
+            ChainIt cb = (*m_bIt).m_chain.begin();
+            ChainIt ce = (*m_bIt).m_chain.end();
+            m_cIt = cb; m_cEnd = ce;
+            skipEmpty();
+        }
+    }
+
+    Entry& operator*()         { return *m_cIt; }
+    HashIterator& operator++() { ++m_cIt; skipEmpty(); return *this; }
+    bool operator==(const HashIterator& o) const {
+        if(m_bIt != o.m_bIt) return false;
+        if(m_bIt == m_bEnd)  return true;
+        return m_cIt == o.m_cIt;
+    }
+    bool operator!=(const HashIterator& o) const { return !(*this == o); }
+};
+
+// HashTable<Trait>
+// hash en un AVL: hash(key) -> bucket -> cadena de colisiones
+template<typename Trait>
+class HashTable : public AVL<Trait> {
+public:
+    using Base        = AVL<Trait>;
+    using Node        = typename Base::Node;          // AVLNode<HashBucket>
+    using Bucket      = typename Trait::value_type;   // HashBucket
+    using key_type    = typename Trait::key_type;
+    using mapped_type = typename Trait::mapped_type;
+    using Entry       = typename Trait::Entry;        // HashEntry
+    using Hasher      = typename Trait::Hasher;
+
+private:
+    Hasher m_hash;
+
+    // ubica el bucket por su hash
+    Node* find_bucket(size_t h) const {
+        Bucket probe(h);
         Node* n = this->m_pRoot;
         while(n) {
             if(!this->m_comp(n->m_data, probe) && !this->m_comp(probe, n->m_data))
@@ -78,77 +143,103 @@ private:
 
 public:
     HashTable() {}
-    HashTable(const HashTable& other) : Base(other) {}              // copia
+    HashTable(const HashTable& other) : Base(other) {}              // copia 
     HashTable(HashTable&& other) noexcept : Base(move(other)) {}    // move
 
-    // permite: m = {{1,"a"}, {2,"b"}}
-    HashTable(initializer_list<Pair> init) {
-        for(const auto& p : init)
-            this->internal_insert(this->m_pRoot, p, Ref{}, nullptr);
+    // m = {{1,"a"}, {2,"b"}}
+    HashTable(initializer_list<Entry> init) {
+        for(const auto& e : init)
+            (*this)[e.m_key] = e.m_value;
     }
 
-    // si la key existe devuelve su valor. si no, la crea
-    Value& operator[](const Key& key) {
+    // m[key]: ubica/crea el bucket por hash y busca la key en la cadena
+    mapped_type& operator[](const key_type& key) {
         unique_lock<shared_mutex> lock(this->m_mtx);
-        Node* n = find_node(key);
-        if(!n) {
-            this->internal_insert(this->m_pRoot, Pair(key), Ref{}, nullptr);
-            n = find_node(key);
+        size_t h = m_hash(key);
+        Node* bnode = find_bucket(h);
+        if(!bnode) {
+            this->internal_insert(this->m_pRoot, Bucket(h), Ref{}, nullptr);
+            bnode = find_bucket(h);                       // re-localiza
         }
-        return n->m_data.m_value;
+        auto& chain = bnode->m_data.m_chain;
+        for(auto& e : chain)
+            if(e.m_key == key) return e.m_value;          // ya existe
+        chain.push_back(Entry(key), (Ref)h);              // colision/nueva
+        for(auto& e : chain)
+            if(e.m_key == key) return e.m_value;
+        throw runtime_error("HashTable::operator[]: insert fallo");
     }
 
-    // como [] pero lanza si la key no existe
-    Value& at(const Key& key) {
+    // at 
+    mapped_type& at(const key_type& key) {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        Node* n = find_node(key);
-        if(!n) throw out_of_range("HashTable::at: key no existe");
-        return n->m_data.m_value;
+        Node* bnode = find_bucket(m_hash(key));
+        if(bnode)
+            for(auto& e : bnode->m_data.m_chain)
+                if(e.m_key == key) return e.m_value;
+        throw out_of_range("HashTable::at: key no existe");
     }
-    const Value& at(const Key& key) const {
+    const mapped_type& at(const key_type& key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        const Node* n = find_node(key);
-        if(!n) throw out_of_range("HashTable::at: key no existe");
-        return n->m_data.m_value;
+        Node* bnode = find_bucket(m_hash(key));
+        if(bnode)
+            for(auto& e : bnode->m_data.m_chain)
+                if(e.m_key == key) return e.m_value;
+        throw out_of_range("HashTable::at: key no existe");
     }
 
-    bool contains(const Key& key) const {
+    bool contains(const key_type& key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        return find_node(key) != nullptr;
+        Node* bnode = find_bucket(m_hash(key));
+        if(!bnode) return false;
+        for(auto& e : bnode->m_data.m_chain)
+            if(e.m_key == key) return true;
+        return false;
     }
 
-    // begin()/end() salen del AVL (inorder)
+    // recorre las entradas por el iterador del AVL + la cadena
+    template<typename Func, typename... Args>
+    void ForEach(Func func, Args&&... args) {
+        this->inorder().forEach([&](Bucket& bucket) {
+            for(auto& e : bucket.m_chain)
+                func(e, forward<Args>(args)...);
+        });
+    }
 
-    // imprime {k: v, ...} ordenado por key
-    friend ostream& operator<<(ostream& os, HashTable& m) {
+    // begin/end con el iterador aplanador -> habilita for (const auto& [k,v] : m)
+    HashIterator<Trait> begin() { return HashIterator<Trait>(Base::begin(), Base::end()); }
+    HashIterator<Trait> end()   { return HashIterator<Trait>(Base::end(),   Base::end()); }
+
+    // {k: v, ...}: reusa el recorrido del AVL + la cadena
+    friend ostream& operator<<(ostream& os, HashTable& h) {
         os << "{";
         bool first = true;
-        m.inorder().forEach([&](const Pair& p) {
+        h.ForEach([&](const Entry& e) {
             if(!first) os << ", ";
-            os << p;                     // reusa el operator<< de KVPair
+            os << e;                  // "key: value"
             first = false;
         });
         return os << "}";
     }
 
-    // lee {k: v, ...} y arma el mapa
-    friend istream& operator>>(istream& is, HashTable& m) {
+    // lee {k: v, ...} y arma la tabla con operator[]
+    friend istream& operator>>(istream& is, HashTable& h) {
         Token ch;
         if(!(is >> ch) || ch != '{') { is.clear(ios_base::failbit); return is; }
-        while((is >> ws).peek() != '}') {            // mira el '}' sin consumirlo
-            Key key; Token colon;
+        while((is >> ws).peek() != '}') {
+            key_type key; Token colon;
             if(!(is >> key >> colon) || colon != ':') break;
             string raw; Token c = '\0';
-            while(is.get(c) && c != ',' && c != '}') raw += c;   // lee el valor hasta , o }
+            while(is.get(c) && c != ',' && c != '}') raw += c;   // valor hasta , o }
             size_t a = raw.find_first_not_of(" \t");
             size_t b = raw.find_last_not_of(" \t");
             raw = (a == string::npos) ? string() : raw.substr(a, b - a + 1);
-            Value val{};
+            mapped_type val{};
             istringstream iss(raw); iss >> val;
-            m[key] = val;
-            if(c == '}') return is;                  // el valor ya consumió el '}'
+            h[key] = val;
+            if(c == '}') return is;
         }
-        is >> ch;                                    // consume el '}' (caso vacío)
+        is >> ch;
         return is;
     }
 };

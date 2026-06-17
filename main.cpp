@@ -1,3 +1,4 @@
+#include <iostream>
 #include "containers/vector.h"
 #include "containers/linkedlist.h"
 #include "containers/doublelinkedlist.h"
@@ -8,14 +9,16 @@
 
 void ListsDemo();
 void TreeDemo();
-void HashDemo();
+void AVLMapDemo(std::ostream&);
+void HashDemo(std::ostream&);
 void DemoMinHeap();
 void DemoMaxHeap();
 
 int main(){
     ListsDemo();
     TreeDemo();
-    HashDemo();
+    AVLMapDemo(std::cout);
+    HashDemo(std::cout);
     DemoMinHeap();
     DemoMaxHeap();
     return 0;
