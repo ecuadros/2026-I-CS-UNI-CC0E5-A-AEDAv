@@ -70,45 +70,39 @@ struct HashTrait : AscendingAVLTrait<HashBucket<Key, Value>> {
 template<typename Trait>
 class HashIterator {
 public:
-    using Bucket   = typename Trait::value_type;
-    using Entry    = typename Trait::Entry;
-    using BucketIt = typename BinaryTree<Trait>::inorder_fwd;
-    using Chain    = LinkedList<HashChainTrait<typename Trait::key_type, typename Trait::mapped_type>>;
-    using ChainIt  = typename Chain::forward_iterator;
+    using Bucket    = typename Trait::value_type;
+    using Entry     = typename Trait::Entry;
+    using BucketIt  = typename BinaryTree<Trait>::inorder_fwd;
+    using Chain     = LinkedList<HashChainTrait<typename Trait::key_type, typename Trait::mapped_type>>;
+    using ChainNode = typename Chain::Node;     // LLNode<HashEntry>
 
 private:
-    BucketIt m_bIt, m_bEnd;
-    ChainIt  m_cIt, m_cEnd;
+    BucketIt   m_bIt, m_bEnd;
+    ChainNode* m_node;     // nodo actual de la cadena (nullptr = cadena agotada)
 
-    // si la cadena actual se agoto, salta al siguiente bucket
+    // si la cadena actual se agoto, salta al siguiente bucket no vacio
     void skipEmpty() {
-        while(m_bIt != m_bEnd && m_cIt == m_cEnd) {
+        while(m_bIt != m_bEnd && m_node == nullptr) {
             ++m_bIt;
-            if(m_bIt != m_bEnd) {
-                ChainIt b = (*m_bIt).m_chain.begin();
-                ChainIt e = (*m_bIt).m_chain.end();
-                m_cIt = b; m_cEnd = e;
-            }
+            if(m_bIt != m_bEnd)
+                m_node = (*m_bIt).m_chain.begin().getNode();   // primer nodo del bucket
         }
     }
 
 public:
-    HashIterator(BucketIt b, BucketIt e)
-        : m_bIt(b), m_bEnd(e), m_cIt(nullptr, nullptr), m_cEnd(nullptr, nullptr) {
+    HashIterator(BucketIt b, BucketIt e) : m_bIt(b), m_bEnd(e), m_node(nullptr) {
         if(m_bIt != m_bEnd) {
-            ChainIt cb = (*m_bIt).m_chain.begin();
-            ChainIt ce = (*m_bIt).m_chain.end();
-            m_cIt = cb; m_cEnd = ce;
+            m_node = (*m_bIt).m_chain.begin().getNode();
             skipEmpty();
         }
     }
 
-    Entry& operator*()         { return *m_cIt; }
-    HashIterator& operator++() { ++m_cIt; skipEmpty(); return *this; }
+    Entry& operator*()         { return m_node->getDataRef(); }
+    HashIterator& operator++() { m_node = m_node->getNext(); skipEmpty(); return *this; }
     bool operator==(const HashIterator& o) const {
         if(m_bIt != o.m_bIt) return false;
         if(m_bIt == m_bEnd)  return true;
-        return m_cIt == o.m_cIt;
+        return m_node == o.m_node;
     }
     bool operator!=(const HashIterator& o) const { return !(*this == o); }
 };
