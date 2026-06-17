@@ -19,15 +19,16 @@ struct DefaultHash {
     size_t operator()(const K& key) const { return std::hash<K>{}(key); }
 };
 
-template <typename T, typename _Comp, typename NodeType, typename _Hasher>
+template <typename T, typename _Comp, typename NodeType, typename _Hasher, template<typename> class _Bucket>
 struct BaseHashTrait : BaseTrait<T, _Comp, NodeType> {
     using Hasher = _Hasher;
+    template<typename Tr> using Bucket = _Bucket<Tr>;
 };
 
 template <typename T>
-struct AscendingHashTrait  : BaseHashTrait<T, less<T>,    AVLNode<T>, DefaultHash<T>> {};
+struct AscendingHashTrait  : BaseHashTrait<T, less<T>,    AVLNode<T>, DefaultHash<T>, AVL> {};
 template <typename T>
-struct DescendingHashTrait : BaseHashTrait<T, greater<T>, AVLNode<T>, DefaultHash<T>> {};
+struct DescendingHashTrait : BaseHashTrait<T, greater<T>, AVLNode<T>, DefaultHash<T>, AVL> {};
 
 template <typename Trait> class HashTable;
 
@@ -62,7 +63,7 @@ public:
     using value_type = typename Trait::value_type;
     using Node       = typename Trait::Node;
     using Hasher     = typename Trait::Hasher;
-    using Bucket     = AVL<Trait>;
+    using Bucket     = typename Trait::template Bucket<Trait>;
     using MySelf     = HashTable<Trait>;
     using iterator   = hash_forward_iterator<MySelf>;
 

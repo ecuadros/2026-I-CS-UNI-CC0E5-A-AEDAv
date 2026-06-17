@@ -6,7 +6,7 @@
 
 using namespace std;
 
-void DemoHashTable() {
+void DemoHashTable(std::ostream&) {
     cout << "--- HashTable (funcion hash + colisiones resueltas con AVL) ---" << endl;
 
     HashTable<AscendingHashTrait<T1>> tabla(4);
