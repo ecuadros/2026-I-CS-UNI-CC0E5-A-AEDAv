@@ -21,24 +21,34 @@ using HashEntry = pair<Key, Value>;
 template<typename Key, typename Value>
 struct HashNode : public AVLNode<Key, HashNode<Key, Value>> {
     using Base = AVLNode<Key, HashNode<Key, Value>>;
-    using value_type = Key;
-    using Entry = HashEntry<Key, Value>;
+    using key_type = Key;
+    using mapped_type = Value;
+    using value_type = key_type;
+    using Entry = HashEntry<key_type, mapped_type>;
 
     Entry entry;
 
-    HashNode(Key key, Ref ref) : Base(key, ref), entry(key, Value()) {}
-    HashNode(Key key, Value value, Ref ref = Ref{}) : Base(key, ref), entry(key, value) {}
+    HashNode(key_type key, Ref ref) : Base(key, ref), entry(key, mapped_type{}) {}
+    HashNode(key_type key, mapped_type value, Ref ref = Ref{}) : Base(key, ref), entry(key, value) {}
 
     friend ostream& operator<<(ostream &os, const HashNode &node) {
         return os << "(" << node.entry.first << "," << node.entry.second << ")";
     }
 };
 
-template<typename Key, typename Value>
-class HashBucket : public AVL<AscendingTrait<HashNode<Key, Value>>> {
+template<typename Node>
+struct HashTableTrait : public BaseTrait<Node, less<typename Node::key_type>> {
+    using key_type = typename Node::key_type;
+    using mapped_type = typename Node::mapped_type;
+};
+
+template<typename Trait>
+class HashBucket : public AVL<Trait> {
 public:
-    using Base = AVL<AscendingTrait<HashNode<Key, Value>>>;
-    using Node = HashNode<Key, Value>;
+    using Base = AVL<Trait>;
+    using key_type = typename Trait::key_type;
+    using mapped_type = typename Trait::mapped_type;
+    using Node = typename Trait::Node;
     using Entry = typename Node::Entry;
 
     HashBucket() : Base() {}
@@ -53,11 +63,18 @@ public:
 
     HashBucket& operator=(const HashBucket &other) {
         if (this != &other) {
+            Node *newRoot = nullptr;
+            typename Base::Comp newComp;
+            {
+                shared_lock<shared_mutex> otherLock(other.m_mtx);
+                newComp = other.m_comp;
+                newRoot = internal_copy(other.m_pRoot);
+            }
+
             unique_lock<shared_mutex> lock(this->m_mtx);
-            shared_lock<shared_mutex> otherLock(other.m_mtx);
             this->internal_clear(this->m_pRoot);
-            this->m_comp = other.m_comp;
-            this->m_pRoot = internal_copy(other.m_pRoot);
+            this->m_comp = newComp;
+            this->m_pRoot = newRoot;
         }
         return *this;
     }
@@ -81,7 +98,7 @@ protected:
     }
 
 private:
-    Node* findNodeUnlocked(const Key &key) const {
+    Node* findNodeUnlocked(const key_type &key) const {
         return this->internal_search(this->m_pRoot, key);
     }
 
@@ -110,7 +127,7 @@ private:
     }
 
 public:
-    bool insertKV(const Key &key, const Value &value, Ref ref = Ref{}) {
+    bool insertKV(const key_type &key, const mapped_type &value, Ref ref = Ref{}) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node *found = findNodeUnlocked(key);
         if (found) {
@@ -126,7 +143,7 @@ public:
         return true;
     }
 
-    Value& getOrInsert(const Key &key, bool &inserted) {
+    mapped_type& getOrInsert(const key_type &key, bool &inserted) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         Node *found = findNodeUnlocked(key);
         if (found) {
@@ -139,7 +156,7 @@ public:
         return findNodeUnlocked(key)->entry.second;
     }
 
-    Value at(const Key &key) const {
+    mapped_type at(const key_type &key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
         Node *found = findNodeUnlocked(key);
         if (!found) {
@@ -148,7 +165,7 @@ public:
         return found->entry.second;
     }
 
-    bool containsKey(const Key &key) const {
+    bool containsKey(const key_type &key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
         return findNodeUnlocked(key) != nullptr;
     }
@@ -169,18 +186,15 @@ public:
     }
 };
 
-template <
-    typename Key,
-    typename Value,
-    typename Hash = hash<Key>
->
+template <typename Trait>
 class HashTable {
 public:
-    using key_type = Key;
-    using mapped_type = Value;
-    using Bucket = HashBucket<Key, Value>;
+    using key_type = typename Trait::key_type;
+    using mapped_type = typename Trait::mapped_type;
+    using Hash = hash<key_type>;
+    using Bucket = HashBucket<Trait>;
     using Entry = typename Bucket::Entry;
-    using MySelf = HashTable<Key, Value, Hash>;
+    using MySelf = HashTable<Trait>;
 
     class const_iterator {
         RefVector<const Entry*> m_items;
@@ -213,13 +227,13 @@ public:
     };
 
 private:
-    Bucket              *m_buckets;
-    size_t               m_capacity;
-    size_t               m_size;
-    Hash                 m_hash;
+    Bucket              *m_buckets = nullptr;
+    size_t               m_capacity = 0;
+    size_t               m_size = 0;
+    Hash                 m_hash{};
     mutable shared_mutex m_mtx;
 
-    size_t bucketIndex(const Key &key) const {
+    size_t bucketIndex(const key_type &key) const {
         return m_hash(key) % m_capacity;
     }
 
@@ -232,54 +246,69 @@ private:
 public:
     HashTable(size_t capacity = 16)
         : m_buckets(new Bucket[capacity == 0 ? 1 : capacity]),
-          m_capacity(capacity == 0 ? 1 : capacity),
-          m_size(0),
-          m_hash() {}
+          m_capacity(capacity == 0 ? 1 : capacity) {}
 
-    HashTable(const MySelf &other)
-        : m_buckets(nullptr), m_capacity(other.m_capacity), m_size(other.m_size), m_hash(other.m_hash) {
+    HashTable(const MySelf &other) {
         shared_lock<shared_mutex> lock(other.m_mtx);
+        m_capacity = other.m_capacity;
+        m_size = other.m_size;
+        m_hash = other.m_hash;
         m_buckets = new Bucket[m_capacity];
         for (size_t i = 0; i < m_capacity; ++i) {
             m_buckets[i] = other.m_buckets[i];
         }
     }
 
-    HashTable(MySelf &&other)
-        : m_buckets(nullptr), m_capacity(0), m_size(0), m_hash(std::move(other.m_hash)) {
+    HashTable(MySelf &&other) {
         unique_lock<shared_mutex> lock(other.m_mtx);
         m_buckets = std::exchange(other.m_buckets, nullptr);
         m_capacity = std::exchange(other.m_capacity, 0);
         m_size = std::exchange(other.m_size, 0);
+        m_hash = std::move(other.m_hash);
     }
 
     MySelf& operator=(const MySelf &other) {
-        if (this != &other) {
-            unique_lock<shared_mutex> lock(m_mtx);
+        if (this == &other) {
+            return *this;
+        }
+
+        Bucket *newBuckets = nullptr;
+        size_t newCapacity;
+        size_t newSize;
+        Hash newHash;
+        {
             shared_lock<shared_mutex> otherLock(other.m_mtx);
-            Bucket *newBuckets = new Bucket[other.m_capacity];
-            for (size_t i = 0; i < other.m_capacity; ++i) {
+            newCapacity = other.m_capacity;
+            newSize = other.m_size;
+            newHash = other.m_hash;
+            newBuckets = new Bucket[newCapacity];
+            for (size_t i = 0; i < newCapacity; ++i) {
                 newBuckets[i] = other.m_buckets[i];
             }
-            delete [] m_buckets;
-            m_buckets = newBuckets;
-            m_capacity = other.m_capacity;
-            m_size = other.m_size;
-            m_hash = other.m_hash;
         }
+
+        unique_lock<shared_mutex> lock(m_mtx);
+        delete [] m_buckets;
+        m_buckets = newBuckets;
+        m_capacity = newCapacity;
+        m_size = newSize;
+        m_hash = newHash;
         return *this;
     }
 
     MySelf& operator=(MySelf &&other) {
-        if (this != &other) {
-            unique_lock<shared_mutex> lock(m_mtx);
-            unique_lock<shared_mutex> otherLock(other.m_mtx);
-            delete [] m_buckets;
-            m_buckets = std::exchange(other.m_buckets, nullptr);
-            m_capacity = std::exchange(other.m_capacity, 0);
-            m_size = std::exchange(other.m_size, 0);
-            m_hash = std::move(other.m_hash);
+        if (this == &other) {
+            return *this;
         }
+
+        unique_lock<shared_mutex> lock(m_mtx, defer_lock);
+        unique_lock<shared_mutex> otherLock(other.m_mtx, defer_lock);
+        std::lock(lock, otherLock);
+        delete [] m_buckets;
+        m_buckets = std::exchange(other.m_buckets, nullptr);
+        m_capacity = std::exchange(other.m_capacity, 0);
+        m_size = std::exchange(other.m_size, 0);
+        m_hash = std::move(other.m_hash);
         return *this;
     }
 
@@ -287,7 +316,7 @@ public:
         delete [] m_buckets;
     }
 
-    bool insert(const Key &key, const Value &value) {
+    bool insert(const key_type &key, const mapped_type &value) {
         unique_lock<shared_mutex> lock(m_mtx);
         bool inserted = m_buckets[bucketIndex(key)].insertKV(key, value);
         if (inserted) {
@@ -296,22 +325,22 @@ public:
         return inserted;
     }
 
-    Value& operator[](const Key &key) {
+    mapped_type& operator[](const key_type &key) {
         unique_lock<shared_mutex> lock(m_mtx);
         bool inserted = false;
-        Value &value = m_buckets[bucketIndex(key)].getOrInsert(key, inserted);
+        mapped_type &value = m_buckets[bucketIndex(key)].getOrInsert(key, inserted);
         if (inserted) {
             ++m_size;
         }
         return value;
     }
 
-    Value at(const Key &key) const {
+    mapped_type at(const key_type &key) const {
         shared_lock<shared_mutex> lock(m_mtx);
         return m_buckets[bucketIndex(key)].at(key);
     }
 
-    bool contains(const Key &key) const {
+    bool contains(const key_type &key) const {
         shared_lock<shared_mutex> lock(m_mtx);
         return m_buckets[bucketIndex(key)].containsKey(key);
     }
@@ -383,8 +412,8 @@ public:
             return is;
         }
 
-        Key key;
-        Value value;
+        key_type key;
+        mapped_type value;
         char comma;
         char closeParen;
 

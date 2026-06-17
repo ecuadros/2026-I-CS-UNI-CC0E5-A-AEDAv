@@ -181,30 +181,42 @@ protected:
 public:
     BinaryTree() = default;
 
-    BinaryTree(const MySelf &other) : m_pRoot(nullptr), m_comp(other.m_comp) {
+    BinaryTree(const MySelf &other) : m_pRoot(nullptr), m_comp() {
         shared_lock<shared_mutex> lock(other.m_mtx);
+        m_comp = other.m_comp;
         m_pRoot = internal_copy(other.m_pRoot);
     }
 
-    BinaryTree(MySelf &&other) : m_pRoot(nullptr), m_comp(std::move(other.m_comp)) {
+    BinaryTree(MySelf &&other) : m_pRoot(nullptr), m_comp() {
         unique_lock<shared_mutex> lock(other.m_mtx);
+        m_comp = std::move(other.m_comp);
         m_pRoot = std::exchange(other.m_pRoot, nullptr);
     }
 
     MySelf& operator=(const MySelf &other) {
         if (this != &other) {
-            clear();
-            shared_lock<shared_mutex> lock(other.m_mtx);
-            m_comp = other.m_comp;
-            m_pRoot = internal_copy(other.m_pRoot);
+            Node *newRoot = nullptr;
+            Comp newComp;
+            {
+                shared_lock<shared_mutex> otherLock(other.m_mtx);
+                newComp = other.m_comp;
+                newRoot = internal_copy(other.m_pRoot);
+            }
+
+            unique_lock<shared_mutex> lock(m_mtx);
+            internal_clear(m_pRoot);
+            m_comp = newComp;
+            m_pRoot = newRoot;
         }
         return *this;
     }
 
     MySelf& operator=(MySelf &&other) {
         if (this != &other) {
-            clear();
-            unique_lock<shared_mutex> lock(other.m_mtx);
+            unique_lock<shared_mutex> lock(m_mtx, defer_lock);
+            unique_lock<shared_mutex> otherLock(other.m_mtx, defer_lock);
+            std::lock(lock, otherLock);
+            internal_clear(m_pRoot);
             m_comp = std::move(other.m_comp);
             m_pRoot = std::exchange(other.m_pRoot, nullptr);
         }

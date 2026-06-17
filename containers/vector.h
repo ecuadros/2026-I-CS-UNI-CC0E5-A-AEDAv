@@ -154,14 +154,22 @@ Vector<Trait>::Vector(Vector &&other){
 template <typename Trait>
 Vector<Trait>& Vector<Trait>::operator=(const Vector &other){
     if(this != &other){
+        size_t new_capacity = 0;
+        size_t new_size = 0;
+        Node *new_data = nullptr;
+        {
+            shared_lock<shared_mutex> otherLock(other.m_mtx);
+            new_capacity = other.m_capacity;
+            new_size = other.m_size;
+            new_data = new Node[new_capacity];
+            for(size_t i = 0; i < new_size; ++i)
+                new_data[i] = other.m_data[i];
+        }
+
         unique_lock<shared_mutex> lock(m_mtx);
-        shared_lock<shared_mutex> otherLock(other.m_mtx);
-        Node *new_data = new Node[other.m_capacity];
-        for(size_t i = 0; i < other.m_size; ++i)
-            new_data[i] = other.m_data[i];
         delete [] m_data;
-        m_capacity = other.m_capacity;
-        m_size = other.m_size;
+        m_capacity = new_capacity;
+        m_size = new_size;
         m_data = new_data;
     }
     return *this;
@@ -170,8 +178,9 @@ Vector<Trait>& Vector<Trait>::operator=(const Vector &other){
 template <typename Trait>
 Vector<Trait>& Vector<Trait>::operator=(Vector &&other){
     if(this != &other){
-        unique_lock<shared_mutex> lock(m_mtx);
-        unique_lock<shared_mutex> otherLock(other.m_mtx);
+        unique_lock<shared_mutex> lock(m_mtx, defer_lock);
+        unique_lock<shared_mutex> otherLock(other.m_mtx, defer_lock);
+        std::lock(lock, otherLock);
         delete [] m_data;
         m_capacity = std::exchange(other.m_capacity, 0);
         m_size = std::exchange(other.m_size, 0);

@@ -6,7 +6,8 @@
 #include "../types.h"
 using namespace std;
 
-using DemoHashTable = HashTable<T1, T1>;
+using DemoHashNode = HashNode<T1, T1>;
+using DemoHashTable = HashTable<HashTableTrait<DemoHashNode>>;
 
 template <typename Table>
 void InsertHashItems(Table &table, initializer_list<pair<typename Table::key_type, typename Table::mapped_type>> items) {
