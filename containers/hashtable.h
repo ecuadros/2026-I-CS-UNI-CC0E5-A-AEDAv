@@ -150,12 +150,12 @@ public:
     mapped_type& operator[](const key_type& key) {
         unique_lock<shared_mutex> lock(this->m_mtx);
         size_t h = m_hash(key);
-        Node* bnode = find_bucket(h);
-        if(!bnode) {
+        Node* bucketNode = find_bucket(h);
+        if(!bucketNode) {
             this->internal_insert(this->m_pRoot, Bucket(h), Ref{}, nullptr);
-            bnode = find_bucket(h);                       // re-localiza
+            bucketNode = find_bucket(h);                       // re-localiza
         }
-        auto& chain = bnode->m_data.m_chain;
+        auto& chain = bucketNode->m_data.m_chain;
         for(auto& e : chain)
             if(e.m_key == key) return e.m_value;          // ya existe
         chain.push_back(Entry(key), (Ref)h);              // colision/nueva
@@ -167,26 +167,26 @@ public:
     // at 
     mapped_type& at(const key_type& key) {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        Node* bnode = find_bucket(m_hash(key));
-        if(bnode)
-            for(auto& e : bnode->m_data.m_chain)
+        Node* bucketNode = find_bucket(m_hash(key));
+        if(bucketNode)
+            for(auto& e : bucketNode->m_data.m_chain)
                 if(e.m_key == key) return e.m_value;
         throw out_of_range("HashTable::at: key no existe");
     }
     const mapped_type& at(const key_type& key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        Node* bnode = find_bucket(m_hash(key));
-        if(bnode)
-            for(auto& e : bnode->m_data.m_chain)
+        Node* bucketNode = find_bucket(m_hash(key));
+        if(bucketNode)
+            for(auto& e : bucketNode->m_data.m_chain)
                 if(e.m_key == key) return e.m_value;
         throw out_of_range("HashTable::at: key no existe");
     }
 
     bool contains(const key_type& key) const {
         shared_lock<shared_mutex> lock(this->m_mtx);
-        Node* bnode = find_bucket(m_hash(key));
-        if(!bnode) return false;
-        for(auto& e : bnode->m_data.m_chain)
+        Node* bucketNode = find_bucket(m_hash(key));
+        if(!bucketNode) return false;
+        for(auto& e : bucketNode->m_data.m_chain)
             if(e.m_key == key) return true;
         return false;
     }
@@ -225,9 +225,9 @@ public:
             if(!(is >> key >> colon) || colon != ':') break;
             string raw; Token c = '\0';
             while(is.get(c) && c != ',' && c != '}') raw += c;   // valor hasta , o }
-            size_t a = raw.find_first_not_of(" \t");
-            size_t b = raw.find_last_not_of(" \t");
-            raw = (a == string::npos) ? string() : raw.substr(a, b - a + 1);
+            size_t start  = raw.find_first_not_of(" \t");
+            size_t finish = raw.find_last_not_of(" \t");
+            raw = (start == string::npos) ? string() : raw.substr(start, finish - start + 1);
             mapped_type val{};
             istringstream iss(raw); iss >> val;
             h[key] = val;
