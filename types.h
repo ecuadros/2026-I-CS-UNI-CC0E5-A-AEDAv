@@ -14,5 +14,6 @@ using T1 = int;
 
 using Ref     = long;
 using Balance = Ref;
+using Factor  = double;
 
 #endif // __TYPES_H__

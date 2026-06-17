@@ -171,11 +171,11 @@ public:
     size_t indexFor(const value_type& key) const { shared_lock<shared_mutex> lock(m_mtx); return indexOf(key); }
     string bucketToString(size_t i) const { shared_lock<shared_mutex> lock(m_mtx); return m_buckets[i].toString(); }
 
-    double loadFactor() const {
+    Factor loadFactor() const {
         shared_lock<shared_mutex> lock(m_mtx);
-        size_t total = 0;
+        Factor total = 0;
         for (size_t i = 0; i < m_numBuckets; ++i) total += m_buckets[i].size();
-        return static_cast<double>(total) / static_cast<double>(m_numBuckets);
+        return total / m_numBuckets;
     }
 
     iterator begin() { return iterator(this, collect(), 0); }
