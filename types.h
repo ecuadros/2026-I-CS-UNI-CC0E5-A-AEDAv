@@ -24,4 +24,6 @@ using Depth  = std::size_t;
 using Token  = char;
 using Byte   = unsigned char;
 
+using TypeBTree = char;
+
 #endif // __TYPES_H__

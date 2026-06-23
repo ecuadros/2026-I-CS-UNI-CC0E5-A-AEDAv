@@ -10,7 +10,7 @@
 #include "traits.h"
 using namespace std;
 
-using TypeBTree = char;
+// TypeBTree definido en types.h
 
 // Worker para prueba de concurrencia
 template <typename BT>
