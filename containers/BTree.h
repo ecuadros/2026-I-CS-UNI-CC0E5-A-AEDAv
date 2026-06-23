@@ -28,7 +28,7 @@ public:
     //iterator
     class Iterator {
     std::vector<std::pair<Page*, Size>> m_stack;
-    const BTree* m_owner = nullptr;   // <-- AGREGAR: para poder lockear en cada operación
+    const BTree* m_owner = nullptr;   
 
     void pushPath(Page* page, Size idx) {
         while (page && page->m_keyCount > 0) {
