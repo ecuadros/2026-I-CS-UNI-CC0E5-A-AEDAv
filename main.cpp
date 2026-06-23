@@ -13,6 +13,7 @@ void AVLMapDemo(std::ostream&);
 void HashDemo(std::ostream&);
 void DemoMinHeap();
 void DemoMaxHeap();
+void BTreeDemo(std::ostream&);
 
 int main(){
     ListsDemo();
@@ -21,5 +22,6 @@ int main(){
     HashDemo(std::cout);
     DemoMinHeap();
     DemoMaxHeap();
+    BTreeDemo(std::cout);
     return 0;
 }
