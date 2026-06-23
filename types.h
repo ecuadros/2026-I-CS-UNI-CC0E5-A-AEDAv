@@ -1,6 +1,8 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#include <cstddef>
+
 // C/C++
 // typedef int Type;
 
@@ -13,5 +15,13 @@ using Type = int;
 using T1 = int;
 
 using Ref = long;
+
+// P1 Tarea Traits: aliases para evitar tipos nativos
+using Size   = std::size_t;
+using Index  = long;
+using Flag   = bool;
+using Depth  = std::size_t;
+using Token  = char;
+using Byte   = unsigned char;
 
 #endif // __TYPES_H__
