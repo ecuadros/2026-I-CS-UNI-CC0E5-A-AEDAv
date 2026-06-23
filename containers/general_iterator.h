@@ -2,6 +2,7 @@
 #define __ITERATOR_H__
 #include <algorithm>
 #include <utility>
+#include "../types.h"
 
 template <typename Container, class IteratorBase> // 
 class general_iterator
@@ -27,7 +28,12 @@ public:
               return *(IteratorBase *)this; // Pending static_cast?
           }
     Node *getNode() const { return m_pNode; }
-    friend bool operator==(const IteratorBase &a, const IteratorBase &b) { return a.getNode() == b.getNode(); }
+    Ref   getRef()  const { return m_pNode ? m_pNode->getRef() : Ref{}; }
+
+    bool operator==(const IteratorBase& other) const {
+        return m_pNode == other.m_pNode;
+    }
+    
     typename Container::value_type &operator*(){
         return m_pNode->getDataRef();
     }

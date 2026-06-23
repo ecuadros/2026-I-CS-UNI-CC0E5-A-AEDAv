@@ -18,7 +18,7 @@ void Add(T& n, T value){
 }
 
 void DemoVector(){
-    Vector<T1> v1(3);
+    Vector<VectorTrait<T1>> v1(3);
     v1.push_back(1, 11);
     v1.push_back(2, 22);
     v1.push_back(-1, -15);
@@ -32,7 +32,7 @@ void DemoVector(){
     //           =========
     //                cout << endl;
 
-    Vector<string> v2(10);
+    Vector<VectorTrait<string>> v2(10);
     v2.push_back("Hola", 5);
     v2.push_back("Mundo", 6);
     v2.push_back("!", 1);
@@ -65,7 +65,7 @@ void DemoVector(){
 
 // DemoConcurrentVector
 void DemoConcurrentVector(){
-    Vector<T1> v(4);
+    Vector<VectorTrait<T1>> v(4);
     v.push_back(0, 0);
     v.push_back(0, 0);
     v.push_back(0, 0);

@@ -5,6 +5,8 @@
 #include <cstddef> // size_t
 #include <string>
 #include <sstream>
+#include <stdexcept>    // out_of_range
+#include <tuple>        // tuple (retorno enriquecido)
 #include <shared_mutex> // shared_mutex
 #include "general_iterator.h"
 #include "util.h"
@@ -55,7 +57,7 @@ public:
     void setData(T data) { m_data = data; }
     Ref  getRef() { return m_ref; }
     void setRef(Ref ref) { m_ref = ref; }
-    
+
 };
 
 template <typename T>
@@ -64,14 +66,19 @@ ostream& operator<<(ostream& os, VectorNode<T>& node){
 }
 
 template <typename T>
+struct VectorTrait {
+    using value_type = T;
+};
+
+template <typename Trait>
 class Vector{
 public:
-    using  value_type = T;
-    using  forward_iterator   = vector_forward_iterator < Vector<T> > ;
+    using  value_type = typename Trait::value_type;
+    using  Node               = VectorNode<value_type>;
+    using  forward_iterator   = vector_forward_iterator < Vector<Trait> > ;
     friend forward_iterator;
-    using  backward_iterator  = vector_backward_iterator< Vector<T> > ;
+    using  backward_iterator  = vector_backward_iterator< Vector<Trait> > ;
     friend backward_iterator;
-    using  Node               = VectorNode<T>;
 private:
     size_t  m_capacity;
     size_t  m_size;
@@ -85,12 +92,15 @@ public:
     virtual size_t size() const;
     virtual string toString() const;
 
+    Node& operator[](size_t index);
+    tuple<value_type, Ref> pop_back();
+
     forward_iterator begin() { return forward_iterator(this, m_data); }
     forward_iterator end()   { return forward_iterator(this, m_data + m_size); }
 
     backward_iterator rbegin() { return backward_iterator(this, m_data + m_size - 1); }
     backward_iterator rend()   { return backward_iterator(this, m_data - 1); }
-    
+
     // Done: Agregar control concurrente
     template <typename Func, typename... Args>
     void ForEach(Func func, Args &&...  args){
@@ -108,20 +118,20 @@ public:
     }
 };
 
-template <typename T>
-Vector<T>::Vector(size_t capacity){
+template <typename Trait>
+Vector<Trait>::Vector(size_t capacity){
     m_capacity = capacity;
     m_size = 0;
     m_data = new Node[capacity];
 }
 
-template <typename T>
-Vector<T>::~Vector(){
+template <typename Trait>
+Vector<Trait>::~Vector(){
     delete [] m_data;
 }
 
-template <typename T>
-void Vector<T>::resize(){
+template <typename Trait>
+void Vector<Trait>::resize(){
     m_capacity = (m_capacity < 10) ? m_capacity+10 : m_capacity * 2;
     Node * new_data = new Node[m_capacity];
     for(size_t i = 0; i < m_size; ++i)
@@ -130,22 +140,41 @@ void Vector<T>::resize(){
     m_data = new_data;
 }
 
-template <typename T>
-void Vector<T>::push_back(value_type value, Ref ref){
+template <typename Trait>
+void Vector<Trait>::push_back(value_type value, Ref ref){
     unique_lock<shared_mutex> lock(m_mtx);
     if(m_size == m_capacity) // Overflow
         resize();
     m_data[m_size++] = Node(value, ref);
 }
 
-template <typename T>
-size_t Vector<T>::size() const{
+template <typename Trait>
+size_t Vector<Trait>::size() const{
     shared_lock<shared_mutex> lock(m_mtx);
     return m_size;
 }
 
-template <typename T>
-string Vector<T>::toString() const{
+template <typename Trait>
+typename Vector<Trait>::Node& Vector<Trait>::operator[](size_t index){
+    shared_lock<shared_mutex> lock(m_mtx);
+    if(index >= m_size)
+        throw out_of_range("Vector::operator[] index out of range");
+    return m_data[index];
+}
+
+template <typename Trait>
+tuple<typename Vector<Trait>::value_type, Ref> Vector<Trait>::pop_back(){
+    unique_lock<shared_mutex> lock(m_mtx);
+    if(m_size == 0)
+        throw out_of_range("Vector::pop_back on empty Vector");
+    Node& last = m_data[m_size - 1];
+    auto result = make_tuple(last.getData(), last.getRef());
+    --m_size;
+    return result;
+}
+
+template <typename Trait>
+string Vector<Trait>::toString() const{
     shared_lock<shared_mutex> lock(m_mtx);
     ostringstream oss;
     oss << "[";
@@ -158,22 +187,26 @@ string Vector<T>::toString() const{
     return oss.str();
 }
 
-template <typename T>
-ostream& operator<<(ostream& os, const Vector<T>& v){
+template <typename Trait>
+ostream& operator<<(ostream& os, const Vector<Trait>& v){
     return os << v.toString();
 }
 
-// TODO: Implementar
-template <typename T>
-istream& operator>>(istream& is, Vector<T>& v){
+// Lee el formato [(data,ref),(data,ref),...] y reconstruye con push_back
+template <typename Trait>
+istream& operator>>(istream& is, Vector<Trait>& v){
+    char ch;
+    if (!(is >> ch) || ch != '[') {
+        is.setstate(ios::failbit);
+        return is;
+    }
+    typename Vector<Trait>::value_type value; Ref ref; char comma, paren;
+    while (is >> ch && ch != ']')
+        if (ch == '(' && (is >> value >> comma >> ref >> paren) && comma == ',' && paren == ')')
+            v.push_back(value, ref);
+    is.ignore(numeric_limits<streamsize>::max(), '\n');
     return is;
 }
-
-// template <typename T>
-// template <typename Func, typename... Args>
-// void Vector<T>::ForEach(Func func, Args &&...  args){
-//     ::ForEach(begin(), end(), func, std::forward<Args>(args)... );
-// }
 
 void DemoVector();
 void DemoConcurrentVector();
