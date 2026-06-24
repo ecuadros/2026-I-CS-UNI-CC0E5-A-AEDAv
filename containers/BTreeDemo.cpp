@@ -3,48 +3,76 @@
 #include <stdlib.h>
 #include <string>
 #include "BTree.h"
+#include "traits.h"
+#include "../types.h"
 
 //const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
 const char * keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
 const char * keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
 
-const int BTreeSize = 3;
-void main(int argc, char * argv[], char * envp[])
+const T1 BTreeSize = 3;
+void runBTreeDemo()
 {
-       int result, i;
-       BTree <char> bt (BTreeSize);
-       for (i = 0; keys1[i]; i++)
-       {
-               //cout<<"Inserting "<<keys1[i]<<endl;
-               result = bt.Insert(keys1[i], i*i);
-               //bt.Print(cout);
-       }
-       bt.Print(cout);
-       /*for (i = 0; keys2[i]; i++)
-       {
-               cout << "Searching " << keys2[i] << " ";
-               long ObjID = bt.Search(keys2[i]);
-               if( ObjID != -1 )
-                       cout << "Achei " << keys2[i] << " ID = " << ObjID << endl;
-               else
-                       cout <<"Nao achei!" << keys2[i] << endl;
-       }*/
-       /*cout.flush();
+    cout << "Demo del BTree" << endl;
+    using MyTreeTrait = AscendingTrait< BTreeData<Character> >;
+    BTree<MyTreeTrait> bt(BTreeSize); 
+    
+    // Inserción
+    for (size_t i = 0; keys1[i]; i++)
+        bt.Insert(keys1[i], i * i);
+    
+    cout << "\nEstado del Arbol despues de la Insercion" << endl;
+    bt.Print(cout);
 
-       for (i = 0; keys3[i]; i++)
-       {
-               cout << "Removing " << keys3[i] << " ";
-               if( bt.Remove(keys3[i], -1) )
-                       cout << keys3[i] << " removido !" << endl;
-               else
-                       cout <<"Nao achei!" << keys3[i] << endl;
-               bt.Print(cout);
-       }
-       bt.Print(cout);
-       cout.flush();*/
-       return 1;
+    cout << "\nProbando Busquedas" << endl;
+    for (size_t i = 0; keys2[i] && i < 15; i++)
+    {
+        cout << "Buscando '" << keys2[i] << "': ";
+        Ref ObjID = bt.Search(keys2[i]);
+        if (ObjID != 0) 
+            cout << "Encontrado ID = " << ObjID << endl;
+        else
+            cout << "No encontrado." << endl;
+    }
 }
+
+
+// void main(int argc, char * argv[], char * envp[]) // Bucle de la cantidad de elementos, el otro se recorre hasta que tenga null
+// {
+//        int result, i;
+//        BTree <char> bt (BTreeSize); // no deberia de ser char sino un tipo generico
+//        for (i = 0; keys1[i]; i++)
+//        {
+//                //cout<<"Inserting "<<keys1[i]<<endl;
+//                result = bt.Insert(keys1[i], i*i);
+//                //bt.Print(cout);
+//        }
+//        bt.Print(cout);
+//        /*for (i = 0; keys2[i]; i++)
+//        {
+//                cout << "Searching " << keys2[i] << " ";
+//                long ObjID = bt.Search(keys2[i]);
+//                if( ObjID != -1 )
+//                        cout << "Achei " << keys2[i] << " ID = " << ObjID << endl;
+//                else
+//                        cout <<"Nao achei!" << keys2[i] << endl;
+//        }*/
+//        /*cout.flush();
+
+//        for (i = 0; keys3[i]; i++)
+//        {
+//                cout << "Removing " << keys3[i] << " ";
+//                if( bt.Remove(keys3[i], -1) )
+//                        cout << keys3[i] << " removido !" << endl;
+//                else
+//                        cout <<"Nao achei!" << keys3[i] << endl;
+//                bt.Print(cout);
+//        }
+//        bt.Print(cout);
+//        cout.flush();*/
+//        return 1;
+// }
 
 
 
