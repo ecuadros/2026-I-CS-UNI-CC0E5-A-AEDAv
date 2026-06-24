@@ -328,17 +328,6 @@ public:
             : nullptr;
     }
 
-    template <typename Func, typename... Args>
-    void forEachPage(Func func, Args&&... args) {
-        lock_guard lock(m_mutex);
-        if (m_root) {
-            m_root->forEachPage(
-                0,
-                func,
-                forward<Args>(args)...);
-        }
-    }
-
     Iterator begin() {
         lock_guard lock(m_mutex);
         return Iterator(m_root, this);

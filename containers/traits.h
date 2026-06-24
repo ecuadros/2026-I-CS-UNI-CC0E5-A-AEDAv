@@ -36,7 +36,4 @@ struct BTreeTrait {
     static constexpr Size Order = _Order;
 };
 
-template <typename _Value, typename _Comp = less<_Value>>
-using Tree23Trait = BTreeTrait<_Value, 2, _Comp>;
-
 #endif // __TRAITS_H__

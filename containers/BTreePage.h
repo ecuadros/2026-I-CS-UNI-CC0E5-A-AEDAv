@@ -458,23 +458,6 @@ public:
             : nullptr;
     }
 
-    template <typename Func, typename... Args>
-    void forEachPage(Level level, Func& func, Args&&... args) {
-        invoke(
-            func,
-            m_keyCount,
-            level,
-            forward<Args>(args)...);
-
-        for (Size index = 0; index <= m_keyCount; ++index) {
-            if (m_subPages[index]) {
-                m_subPages[index]->forEachPage(
-                    level + 1,
-                    func,
-                    forward<Args>(args)...);
-            }
-        }
-    }
 };
 
 #endif // BTREE_PAGE_H
