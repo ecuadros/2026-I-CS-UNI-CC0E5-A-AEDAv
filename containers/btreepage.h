@@ -159,18 +159,18 @@ public:
         return m_children[i].getData()->search(key);
     }
 
-    // recorrido inorder: hijo, clave, hijo, clave, ... ultimo hijo
+    // recorrido inorder: hijo, clave, hijo, clave, ... ultimo hijo. pasa el nodo (clave+ref)
     template<typename Func, typename... Args>
     void forEach(Func func, Args&&... args) {
         size_t n = m_keys.size();
         for(size_t i = 0; i < n; ++i) {
             if(!m_leaf) m_children[i].getData()->forEach(func, args...);
-            func(m_keys[i].getDataRef(), args...);
+            func(m_keys[i], args...);
         }
         if(!m_leaf) m_children[n].getData()->forEach(func, args...);
     }
 
-    // primer (clave, ref) inorder que cumple el predicado
+    // primer nodo (clave, ref) inorder que cumple el predicado
     template<typename Pred, typename... Args>
     KeyNode* firstThat(Pred pred, Args&&... args) {
         size_t n = m_keys.size();
@@ -179,7 +179,7 @@ public:
                 KeyNode* r = m_children[i].getData()->firstThat(pred, args...);
                 if(r) return r;
             }
-            if(pred(m_keys[i].getDataRef(), args...))
+            if(pred(m_keys[i], args...))
                 return &m_keys[i];
         }
         if(!m_leaf) {
@@ -187,17 +187,6 @@ public:
             if(r) return r;
         }
         return nullptr;
-    }
-
-    // subarbol inorder por niveles ("clave->ref")
-    void appendToString(ostringstream& oss, size_t level) {
-        size_t n = m_keys.size();
-        for(size_t i = 0; i < n; ++i) {
-            if(!m_leaf) m_children[i].getData()->appendToString(oss, level + 1);
-            for(size_t s = 0; s < level; ++s) oss << "\t";
-            oss << m_keys[i].getDataRef() << "->" << m_keys[i].getRef() << "\n";
-        }
-        if(!m_leaf) m_children[n].getData()->appendToString(oss, level + 1);
     }
 };
 

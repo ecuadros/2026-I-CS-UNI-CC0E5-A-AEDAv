@@ -77,20 +77,34 @@ public:
         return { p->getDataRef(), p->getRef() };
     }
 
-    string toString() {
-        shared_lock<shared_mutex> lock(m_mtx);
-        ostringstream oss;
-        m_root.appendToString(oss, 0);
-        return oss.str();
+    // imprime [(clave,ref),...] recorriendo con ForEach (reusa VectorNode::operator<<)
+    friend ostream& operator<<(ostream& os, BTree& bt) {
+        os << "[";
+        bool first = true;
+        bt.ForEach([&](KeyNode& n) { os << (first ? "" : ",") << n; first = false; });
+        return os << "]";
     }
+
+    // lee [(clave,ref),...] reusando VectorNode::operator>> y reinserta (insert toma el lock)
+    friend istream& operator>>(istream& is, BTree& bt) {
+        Token ch;
+        if(!(is >> ch) || ch != '[') { is.setstate(ios_base::failbit); return is; }
+        if((is >> ws).peek() == ']') { is >> ch; return is; }
+        VectorNode<value_type> node;
+        while(is >> node) {
+            bt.insert(node.getData(), node.getRef());
+            is >> ch;
+            if(ch == ']') break;
+            else if(ch != ',') { is.setstate(ios_base::failbit); break; }
+        }
+        return is;
+    }
+
+    string toString() { ostringstream oss; oss << *this; return oss.str(); }
 
     size_t height() { shared_lock<shared_mutex> lock(m_mtx); return m_height;  }
     size_t size()   { shared_lock<shared_mutex> lock(m_mtx); return m_numKeys; }
     size_t order()  { shared_lock<shared_mutex> lock(m_mtx); return m_order;   }
-
-    friend ostream& operator<<(ostream& os, BTree& bt) {
-        return os << bt.toString();
-    }
 };
 
 #endif // __BTREE_H__

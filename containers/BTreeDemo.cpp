@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include "../types.h"
 #include "btree.h"
@@ -18,20 +19,35 @@ void BTreeDemo(ostream& os) {
     os << "altura: " << bt.height() << " | claves: " << bt.size()
        << " | orden: " << bt.order() << endl;
 
-    // toString / operator<< : el arbol inorder ("clave->ref")
-    os << "arbol (inorder, sangria por nivel):" << endl;
-    os << bt;
+    // operator<< : [(clave,ref),...] en inorder
+    os << "operator<<: " << bt << endl;
 
-    // ForEach variadico: claves en orden ascendente
+    // ForEach variadico: ahora el callback recibe el nodo (clave+ref)
     os << "ForEach (inorder): ";
-    bt.ForEach([&os](T1 key) { os << key << " "; });
+    bt.ForEach([&os](auto& node) { os << node.getData() << " "; });
     os << endl;
 
-    // FirstThat variadico: primera clave que cumple el predicado
-    auto [k, r] = bt.FirstThat([](T1 key) { return key > 50; });
+    // FirstThat variadico: primer nodo que cumple el predicado
+    auto [k, r] = bt.FirstThat([](auto& node) { return node.getData() > 50; });
     os << "FirstThat (> 50): clave=" << k << " ref=" << r << endl;
 
     // search (clave, ref)
     auto [sk, sr] = bt.search(35);
     os << "search(35): clave=" << sk << " ref=" << sr << endl;
+
+    // operator>> : round-trip a archivo
+    ofstream out("BTREE.txt");
+    out << bt;
+    out.close();
+    BTree<AscendingBTreeTrait<T1>> bt2(3);
+    ifstream in("BTREE.txt");
+    in >> bt2;
+    in.close();
+    os << "leido de archivo: " << bt2 << endl;
+
+    // comparador flexible: mismo codigo, orden invertido segun el Trait
+    BTree<DescendingBTreeTrait<T1>> btDesc(3);
+    for(size_t i = 0; i < n; ++i)
+        btDesc.insert(claves[i], (Ref)(i * i));
+    os << "descendente (DescendingBTreeTrait): " << btDesc << endl;
 }
