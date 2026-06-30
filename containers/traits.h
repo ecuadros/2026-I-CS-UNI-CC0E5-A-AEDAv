@@ -29,11 +29,11 @@ struct KVTrait {
     using Comp = _Comp;
 };
 
-template <typename _Value, Size _Order, typename _Comp = less<_Value>>
+// (comp flexible)
+template <typename _Value, typename _Comp = less<_Value>>
 struct BTreeTrait {
     using value_type = _Value;
     using Comp = _Comp;
-    static constexpr Size Order = _Order;
 };
 
 #endif // __TRAITS_H__

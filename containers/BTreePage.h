@@ -52,8 +52,6 @@ public:
     using Entry = BTreeEntry<Trait>;
     using Page = BTreePage<Trait>;
 
-    static constexpr Size Order = Trait::Order;
-
 private:
     friend class BTree<Trait>;
 
@@ -339,6 +337,36 @@ private:
         m_subPages[2] = thirdChild;
     }
 
+    // (each y firstthat)
+    template <typename Func, typename... Args>
+    Entry* eachUntil(Level level, Func& func, Args&&... args) {
+        for (Size index = 0; index < m_keyCount; ++index) {
+            if (m_subPages[index]) {
+                Entry* found = m_subPages[index]->eachUntil(
+                    level + 1,
+                    func,
+                    forward<Args>(args)...);
+                if (found)
+                    return found;
+            }
+
+            if (invoke(
+                    func,
+                    m_keys[index],
+                    level,
+                    forward<Args>(args)...)) {
+                return &m_keys[index];
+            }
+        }
+
+        return m_subPages[m_keyCount]
+            ? m_subPages[m_keyCount]->eachUntil(
+                level + 1,
+                func,
+                forward<Args>(args)...)
+            : nullptr;
+    }
+
 public:
     explicit BTreePage(Size maxKeys, Flag unique = true)
         : m_maxKeys(maxKeys),
@@ -406,56 +434,22 @@ public:
 
     template <typename Func, typename... Args>
     void forEach(Level level, Func& func, Args&&... args) {
-        for (Size index = 0; index < m_keyCount; ++index) {
-            if (m_subPages[index]) {
-                m_subPages[index]->forEach(
-                    level + 1,
-                    func,
-                    forward<Args>(args)...);
-            }
-
+        // (each y firstthat)
+        auto visitAll = [&func](Entry& entry, Level entryLevel, auto&&... values) {
             invoke(
                 func,
-                m_keys[index],
-                level,
-                forward<Args>(args)...);
-        }
-
-        if (m_subPages[m_keyCount]) {
-            m_subPages[m_keyCount]->forEach(
-                level + 1,
-                func,
-                forward<Args>(args)...);
-        }
+                entry,
+                entryLevel,
+                forward<decltype(values)>(values)...);
+            return false;
+        };
+        eachUntil(level, visitAll, forward<Args>(args)...);
     }
 
     template <typename Func, typename... Args>
     Entry* firstThat(Level level, Func& func, Args&&... args) {
-        for (Size index = 0; index < m_keyCount; ++index) {
-            if (m_subPages[index]) {
-                Entry* found = m_subPages[index]->firstThat(
-                    level + 1,
-                    func,
-                    forward<Args>(args)...);
-                if (found)
-                    return found;
-            }
-
-            if (invoke(
-                    func,
-                    m_keys[index],
-                    level,
-                    forward<Args>(args)...)) {
-                return &m_keys[index];
-            }
-        }
-
-        return m_subPages[m_keyCount]
-            ? m_subPages[m_keyCount]->firstThat(
-                level + 1,
-                func,
-                forward<Args>(args)...)
-            : nullptr;
+        // (each y firstthat)
+        return eachUntil(level, func, forward<Args>(args)...);
     }
 
 };

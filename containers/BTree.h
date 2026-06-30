@@ -26,8 +26,6 @@ public:
     using Entry = typename Page::Entry;
     using Node = Page;
 
-    static constexpr Size Order = Trait::Order;
-
     class Iterator {
     public:
         using iterator_category = forward_iterator_tag;
@@ -97,11 +95,83 @@ public:
         }
     };
 
+    // (backward iterator)
+    class BackwardIterator {
+    public:
+        using iterator_category = forward_iterator_tag;
+        using value_type = Entry;
+        using difference_type = ptrdiff_t;
+        using pointer = Entry*;
+        using reference = Entry&;
+
+    private:
+        vector<pair<Page*, Size>> m_stack;
+        const BTree* m_owner{nullptr};
+
+        void pushRightPath(Page* page) {
+            while (page && page->m_keyCount > 0) {
+                Size index = page->m_keyCount - 1;
+                m_stack.emplace_back(page, index);
+                page = page->m_subPages[index + 1];
+            }
+        }
+
+    public:
+        BackwardIterator() = default;
+
+        BackwardIterator(Page* root, const BTree* owner)
+            : m_owner(owner) {
+            pushRightPath(root);
+        }
+
+        reference operator*() const {
+            lock_guard lock(m_owner->m_mutex);
+            const auto& [page, index] = m_stack.back();
+            return page->m_keys[index];
+        }
+
+        pointer operator->() const {
+            return &operator*();
+        }
+
+        BackwardIterator& operator++() {
+            lock_guard lock(m_owner->m_mutex);
+            auto [page, index] = m_stack.back();
+            m_stack.pop_back();
+
+            if (index > 0)
+                m_stack.emplace_back(page, index - 1);
+
+            pushRightPath(page->m_subPages[index]);
+            return *this;
+        }
+
+        BackwardIterator operator++(int) {
+            BackwardIterator previous = *this;
+            ++(*this);
+            return previous;
+        }
+
+        friend Flag operator==(
+            const BackwardIterator& left,
+            const BackwardIterator& right) {
+            return left.m_stack == right.m_stack;
+        }
+
+        friend Flag operator!=(
+            const BackwardIterator& left,
+            const BackwardIterator& right) {
+            return !(left == right);
+        }
+    };
+
 private:
     Page* m_root;
     Level m_height;
     Flag m_unique;
     Size m_numKeys;
+    // (orden flexible)
+    Size m_order;
     mutable mutex m_mutex;
 
     Page* deepCopy(const Page* source) const {
@@ -142,8 +212,8 @@ private:
 
     void rebuild(const vector<Entry>& entries) {
         delete m_root;
-        m_root = new Page(2 * Order + 1, m_unique);
-        m_root->setMaxKeysForChildren(Order);
+        m_root = new Page(2 * m_order + 1, m_unique);
+        m_root->setMaxKeysForChildren(m_order);
         m_height = 1;
         m_numKeys = 0;
 
@@ -162,37 +232,46 @@ private:
     }
 
 public:
-    explicit BTree(Flag unique = true)
-        : m_root(new Page(2 * Order + 1, unique)),
+    // (orden flexible)
+    explicit BTree(Size order = 3, Flag unique = true)
+        : m_root(nullptr),
           m_height(1),
           m_unique(unique),
-          m_numKeys(0) {
-        static_assert(Order >= 2, "El orden del BTree debe ser al menos 2");
-        m_root->setMaxKeysForChildren(Order);
+          m_numKeys(0),
+          m_order(order) {
+        if (m_order < 2)
+            throw invalid_argument("El orden del BTree debe ser al menos 2");
+
+        m_root = new Page(2 * m_order + 1, unique);
+        m_root->setMaxKeysForChildren(m_order);
     }
 
     BTree(const BTree& other)
         : m_root(nullptr),
           m_height(1),
           m_unique(true),
-          m_numKeys(0) {
+          m_numKeys(0),
+          m_order(3) {
         lock_guard lock(other.m_mutex);
         m_root = deepCopy(other.m_root);
         m_height = other.m_height;
         m_unique = other.m_unique;
         m_numKeys = other.m_numKeys;
+        m_order = other.m_order;
     }
 
     BTree(BTree&& other) noexcept
         : m_root(nullptr),
           m_height(0),
           m_unique(true),
-          m_numKeys(0) {
+          m_numKeys(0),
+          m_order(3) {
         unique_lock lock(other.m_mutex);
         m_root = exchange(other.m_root, nullptr);
         m_height = exchange(other.m_height, 0);
         m_unique = other.m_unique;
         m_numKeys = exchange(other.m_numKeys, 0);
+        m_order = exchange(other.m_order, 3);
     }
 
     BTree& operator=(const BTree& other) {
@@ -205,6 +284,7 @@ public:
         swap(m_height, copy.m_height);
         swap(m_unique, copy.m_unique);
         swap(m_numKeys, copy.m_numKeys);
+        swap(m_order, copy.m_order);
         return *this;
     }
 
@@ -218,6 +298,7 @@ public:
         m_height = exchange(other.m_height, 0);
         m_unique = other.m_unique;
         m_numKeys = exchange(other.m_numKeys, 0);
+        m_order = exchange(other.m_order, 3);
         return *this;
     }
 
@@ -228,8 +309,8 @@ public:
     Flag insert(const value_type& key, Ref ref) {
         unique_lock lock(m_mutex);
         if (!m_root) {
-            m_root = new Page(2 * Order + 1, m_unique);
-            m_root->setMaxKeysForChildren(Order);
+            m_root = new Page(2 * m_order + 1, m_unique);
+            m_root->setMaxKeysForChildren(m_order);
             m_height = 1;
         }
 
@@ -302,8 +383,9 @@ public:
         return m_height;
     }
 
-    constexpr Size order() const {
-        return Order;
+    Size order() const {
+        lock_guard lock(m_mutex);
+        return m_order;
     }
 
     template <typename Func, typename... Args>
@@ -344,6 +426,25 @@ public:
 
     Iterator end() const {
         return Iterator();
+    }
+
+    // (backward iterator)
+    BackwardIterator rbegin() {
+        lock_guard lock(m_mutex);
+        return BackwardIterator(m_root, this);
+    }
+
+    BackwardIterator rend() {
+        return BackwardIterator();
+    }
+
+    BackwardIterator rbegin() const {
+        lock_guard lock(m_mutex);
+        return BackwardIterator(m_root, this);
+    }
+
+    BackwardIterator rend() const {
+        return BackwardIterator();
     }
 
     string toString() const {

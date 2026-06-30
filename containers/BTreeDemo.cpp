@@ -1,7 +1,10 @@
 #include <cctype>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "../types.h"
 #include "BTree.h"
@@ -10,12 +13,21 @@
 using namespace std;
 
 
-using Trait = BTreeTrait<TypeBTree, 3>;
+// (comp flexible)
+using Trait = BTreeTrait<TypeBTree>;
 using BT = BTree<Trait>;
+
+// (concurrencia)
+static void concurrencyWorker(BT& tree, Ref workerId)
+{
+    for (Size i = 0; i < 100; i++)
+        tree.insert(TypeBTree('a' + ((workerId + i) % 26)), workerId);
+}
 
 void DemoBTree()
 {
-    BT bt;
+    // (orden flexible)
+    BT bt(3);
     string keys = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
 
     for (Size i = 0; i < keys.size(); i++)
@@ -63,4 +75,34 @@ void DemoBTree()
         inOrder += entry.m_data;
 
     cout << "inorder: " << inOrder << endl;
+
+    // (backward iterator)
+    string reverseOrder;
+    for (auto it = bt.rbegin(); it != bt.rend(); ++it)
+        reverseOrder += it->m_data;
+
+    cout << "reverse: " << reverseOrder << endl;
+
+    // (operator >>)
+    stringstream stream;
+    stream << bt;
+
+    BT restored(3);
+    stream >> restored;
+    cout << "restaurado size=" << restored.size() << endl;
+
+    // (concurrencia)
+    BT concurrentTree(3);
+    vector<thread> threads;
+
+    for (Size i = 0; i < 4; i++) {
+        threads.emplace_back([&concurrentTree, i]() {
+            concurrencyWorker(concurrentTree, Ref(i + 1));
+        });
+    }
+
+    for (auto& thread : threads)
+        thread.join();
+
+    cout << "concurrente size=" << concurrentTree.size() << endl;
 }
