@@ -50,4 +50,10 @@ void BTreeDemo(ostream& os) {
     for(size_t i = 0; i < n; ++i)
         btDesc.insert(claves[i], (Ref)(i * i));
     os << "descendente (DescendingBTreeTrait): " << btDesc << endl;
+
+    // remove: borra varias claves y muestra que el arbol sigue ordenado
+    bt.remove(50); bt.remove(10); bt.remove(85); bt.remove(35);
+    os << "tras remove(50,10,85,35): " << bt << endl;
+    os << "altura: " << bt.height() << " | claves: " << bt.size() << endl;
+    os << "contiene 50? " << (bt.remove(50) ? "si (borrada de nuevo?!)" : "no (ya no esta)") << endl;
 }

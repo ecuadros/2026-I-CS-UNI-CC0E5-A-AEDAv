@@ -36,8 +36,11 @@ private:
     mutable shared_mutex m_mtx;
 
 public:
+    // raiz con capacidad 2*orden+1; los hijos se crean con 'orden' (B* del profe)
     BTree(size_t order = DEFAULT_BTREE_ORDER)
-        : m_root(true, order), m_order(order), m_height(1), m_numKeys(0) {}
+        : m_root(2 * order + 1), m_order(order), m_height(1), m_numKeys(0) {
+        m_root.setMaxKeysForChilds(order);
+    }
 
     BTree(const BTree&)            = delete;
     BTree& operator=(const BTree&) = delete;
@@ -47,18 +50,28 @@ public:
         m_root.clear();
     }
 
-    // insercion. si la raiz esta llena la divide y sube un nivel
+    // insercion B* (reactiva): si la raiz se desborda, la parte y sube un nivel
     void insert(const value_type& key, Ref ref) {
         unique_lock<shared_mutex> lock(m_mtx);
-        if(m_root.isFull()) { m_root.splitRoot(); ++m_height; }
-        m_root.insertNonFull(key, ref);
+        bt_ErrorCode error = m_root.insert(key, ref);
         ++m_numKeys;
+        if(error == bt_overflow) { m_root.splitRoot(); ++m_height; }
     }
 
     // retorno (clave, ref)
     tuple<value_type, Ref> search(const value_type& key) {
         shared_lock<shared_mutex> lock(m_mtx);
         return m_root.search(key);
+    }
+
+    // borrado B* (reactivo): si la raiz se fusiona, baja un nivel. Devuelve false si no existe
+    bool remove(const value_type& key, Ref ref = Ref{}) {
+        unique_lock<shared_mutex> lock(m_mtx);
+        bt_ErrorCode error = m_root.remove(key, ref);
+        if(error == bt_nofound) return false;
+        --m_numKeys;
+        if(error == bt_rootmerged) --m_height;
+        return true;
     }
 
     // recorrido inorder con callback variadico (perfect forwarding)
