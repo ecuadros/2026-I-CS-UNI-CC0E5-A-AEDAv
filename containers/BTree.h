@@ -4,19 +4,24 @@
 #define BTREE_H
 
 #include <iostream>
+#include <shared_mutex>
 #include "BTreePage.h"
 #include "traits.h"
 #include "../types.h"
+#include "BTreeIterator.h"
 
 #define DEFAULT_BTREE_ORDER 3
 
 template <typename Trait>
 class BTree {
 public:
+       using MySelf     = BTree<Trait>;
        using value_type = typename Trait::value_type;
        using Comp       = typename Trait::Comp;
        using ObjectInfo = BTreeData<value_type>;
        using BTPage     = CBTreePage<Trait>;
+       using iterator         = BTreeForwardIterator<MySelf>;
+       using reverse_iterator = BTreeBackwardIterator<MySelf>;
 
 public:
        BTree(size_t order = DEFAULT_BTREE_ORDER, bool unique = true);
@@ -28,8 +33,12 @@ public:
        size_t       size()   const { return m_NumKeys; }
        size_t       height() const { return m_Height;  }
        size_t       GetOrder() const { return m_Order; }
-       void         Print(ostream &os);
        
+       iterator begin() { return iterator(&m_Root, false); }
+       iterator end()   { return iterator(&m_Root, true);  }
+       reverse_iterator rbegin() { return reverse_iterator(&m_Root, false); }
+       reverse_iterator rend()   { return reverse_iterator(&m_Root, true);  }
+
        template <typename Func, typename... Args>
        void ForEach(Func func, Args&&... args); 
 
@@ -42,6 +51,10 @@ protected:
        size_t       m_Order;  
        size_t       m_NumKeys;
        bool         m_Unique; 
+       mutable shared_mutex m_mtx;
+
+       template <typename Func, typename... Args>
+       auto call(Func func, Args&&... args);
 };
 
 const size_t MaxHeight = 5;
@@ -96,25 +109,45 @@ Ref BTree<Trait>::Search(const value_type key)
        return ObjID;
 }
 
+template <typename Trait>
+template <typename Func, typename... Args>
+auto BTree<Trait>::call(Func func, Args&&... args)
+{
+       using RetType = std::invoke_result_t<Func, ObjectInfo&, size_t, Args...>;
+       constexpr bool is_void = std::is_void_v<RetType>;
+       std::shared_lock<std::shared_mutex> lock(m_mtx);
+
+       for (auto it = begin(); it != end(); ++it) 
+       {
+           if constexpr (is_void) {
+               std::invoke(func, *it, 0, std::forward<Args>(args)...);
+           } else {
+               if (std::invoke(func, *it, 0, std::forward<Args>(args)...)) {
+                   return &(*it);
+               }
+           }
+       }
+
+       if constexpr (!is_void) {
+           return static_cast<ObjectInfo*>(nullptr);
+       }
+}
 
 template <typename Trait>
 template <typename Func, typename... Args>
 void BTree<Trait>::ForEach(Func func, Args&&... args)
 {
-    m_Root.ForEach(func, 0, std::forward<Args>(args)...);
+    call(func, std::forward<Args>(args)...);
 }
 
 template <typename Trait>
 template <typename Func, typename... Args>
 typename BTree<Trait>::ObjectInfo* BTree<Trait>::FirstThat(Func func, Args&&... args)
 {
-    return m_Root.FirstThat(func, 0, std::forward<Args>(args)...);
+    return call(func, std::forward<Args>(args)...);
 }
 
-template <typename Trait>
-void BTree<Trait>::Print(ostream &os){
-       m_Root.Print(os);
-}
+// Elimnando el Print Helper
 
 
 

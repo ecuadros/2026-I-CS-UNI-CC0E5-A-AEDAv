@@ -23,7 +23,10 @@ void runBTreeDemo()
         bt.Insert(keys1[i], i * i);
     
     cout << "\nEstado del Arbol despues de la Insercion" << endl;
-    bt.Print(cout);
+    bt.ForEach([](const auto& info, size_t level) {
+        cout << info.key << "->" << info.ref << "  ";
+    });
+    cout << "\n";
 
     cout << "\nProbando Busquedas" << endl;
     for (size_t i = 0; keys2[i] && i < 15; i++)

@@ -44,6 +44,12 @@ class CBTreePage
 // this is the in-memory version of the CBTreePage
 {
        friend class BTree<Trait>;
+       
+       template <typename TreeType> 
+       friend class BTreeIteratorBase;
+       
+       template <typename TreeType, bool IsForward>
+       friend class BTreeIterator;
 
        using value_type = typename Trait::value_type;
        using Comp       = typename Trait::Comp;
@@ -57,13 +63,8 @@ class CBTreePage
        bt_ErrorCode    Insert (const value_type &key, const Ref ObjID);
        bt_ErrorCode    Remove (const value_type &key, const Ref ObjID);
        bool            Search (const value_type &key, Ref &ObjID);
-       void            Print  (ostream &os);
 
-       template <typename Func, typename... Args>
-       void            ForEach(Func func, size_t level, Args&&... args);
-
-       template <typename Func, typename... Args>
-       ObjectInfo* FirstThat(Func func, size_t level, Args&&... args);
+       // Delegando responsabilidad al iterador
 
 protected:
        size_t  m_MinKeys; // minimum number of keys in a node
@@ -527,44 +528,6 @@ void CBTreePage<keyType, ObjIDType>::ForEachReverse(lpfnForEach2 lpfn, int level
 }*/
 
 template <typename Trait>
-template <typename Func, typename... Args>
-void CBTreePage<Trait>::ForEach(Func func, size_t level, Args&&... args)
-{
-       for( size_t i = 0 ; i < m_KeyCount ; i++)
-       {
-               if( m_SubPages[i] )
-                       m_SubPages[i]->ForEach(func, level+1, std::forward<Args>(args)...);
-               func(m_Keys[i], level, std::forward<Args>(args)...);
-       }
-       if( m_SubPages[m_KeyCount] )
-               m_SubPages[m_KeyCount]->ForEach(func, level+1, std::forward<Args>(args)...);
-}
-
-template <typename Trait>
-template <typename Func, typename... Args>
-typename CBTreePage<Trait>::ObjectInfo *CBTreePage<Trait>::FirstThat(Func func,
-                                          size_t level, Args&&... args)
-{
-       ObjectInfo *pTmp;
-       for( size_t i = 0 ; i < m_KeyCount ; i++)
-       {
-               if( m_SubPages[i] ){
-                        pTmp = m_SubPages[i]->FirstThat(func, level + 1, std::forward<Args>(args)...);
-                       if( pTmp )
-                               return pTmp;
-               }
-               if( func(m_Keys[i], level, std::forward<Args>(args)...) )
-                       return &m_Keys[i];
-       }
-       if( m_SubPages[m_KeyCount] ){
-                pTmp = m_SubPages[m_KeyCount]->FirstThat(func, level + 1, std::forward<Args>(args)...);
-               if( pTmp )
-                       return pTmp;
-       }
-       return nullptr;
-}
-
-template <typename Trait>
 bt_ErrorCode CBTreePage<Trait>::Remove(const value_type &key, Ref ObjID)
 {
        bt_ErrorCode error = bt_ok;
@@ -728,16 +691,6 @@ CBTreePage<Trait>::GetFirstObjectInfo()
 }
 
 // Deben eliminarlo e imprimir con un ForEach
-template <typename Trait>
-void CBTreePage<Trait>::Print(ostream & os)
-{
-        auto printNode = [](const ObjectInfo& info, size_t level, ostream& stream) {
-                for( size_t i = 0; i < level ; i++)
-                        stream << "\t";
-                stream << info.key << "->" << info.ref << "\n";
-        };
-        this->ForEach(printNode, 0, os);
-}
 
 template <typename Trait>
 void CBTreePage<Trait>::Create()
