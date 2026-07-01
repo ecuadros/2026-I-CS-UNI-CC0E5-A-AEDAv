@@ -91,38 +91,47 @@ public:
     };
     ReverseView reversed() { return ReverseView{*this}; }
 
-    // recorrido forward: callback void -> visita todo (call lo maneja)
+private:
+    // UNICO bucle. callback void -> visita todo (ForEach). con valor -> para en el 1er true (FirstThat)
+    template<typename It, typename Func, typename... Args>
+    KeyNode* traverse(It it, Func func, Args&&... args) {
+        for(It e; it != e; ++it) {
+            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
+                call(func, *it, args...);
+            else if(call(func, *it, args...))
+                return &(*it);
+        }
+        return nullptr;
+    }
+
+public:
+    // los 4 recorridos son envoltorios sobre traverse: cambian iterador (fwd/bwd) y callback (void/valor)
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        for(forward_iterator it = forward_iterator::first(&m_root), e; it != e; ++it)
-            call(func, *it, forward<Args>(args)...);
+        traverse(forward_iterator::first(&m_root), func, forward<Args>(args)...);
     }
 
-    // recorrido backward
     template<typename Func, typename... Args>
     void ReverseForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        for(backward_iterator it = backward_iterator::first(&m_root), e; it != e; ++it)
-            call(func, *it, forward<Args>(args)...);
+        traverse(backward_iterator::first(&m_root), func, forward<Args>(args)...);
     }
 
-    // primer (clave, ref) forward que cumple el predicado; callback con valor
     template<typename Pred, typename... Args>
     tuple<value_type, Ref> FirstThat(Pred pred, Args&&... args) {
         shared_lock<shared_mutex> lock(m_mtx);
-        for(forward_iterator it = forward_iterator::first(&m_root), e; it != e; ++it)
-            if(call(pred, *it, forward<Args>(args)...)) return { it->getDataRef(), it->getRef() };
-        throw runtime_error("BTree::FirstThat: ninguna clave cumple");
+        KeyNode* p = traverse(forward_iterator::first(&m_root), pred, forward<Args>(args)...);
+        if(!p) throw runtime_error("BTree::FirstThat: ninguna clave cumple");
+        return { p->getDataRef(), p->getRef() };
     }
 
-    // FirstThat de mayor a menor
     template<typename Pred, typename... Args>
     tuple<value_type, Ref> ReverseFirstThat(Pred pred, Args&&... args) {
         shared_lock<shared_mutex> lock(m_mtx);
-        for(backward_iterator it = backward_iterator::first(&m_root), e; it != e; ++it)
-            if(call(pred, *it, forward<Args>(args)...)) return { it->getDataRef(), it->getRef() };
-        throw runtime_error("BTree::ReverseFirstThat: ninguna clave cumple");
+        KeyNode* p = traverse(backward_iterator::first(&m_root), pred, forward<Args>(args)...);
+        if(!p) throw runtime_error("BTree::ReverseFirstThat: ninguna clave cumple");
+        return { p->getDataRef(), p->getRef() };
     }
 
     // imprime [(clave,ref),...] recorriendo con ForEach (reusa VectorNode::operator<<)
