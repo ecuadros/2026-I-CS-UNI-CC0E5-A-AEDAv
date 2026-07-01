@@ -93,12 +93,14 @@ public:
 
 private:
     // UNICO bucle. callback void -> visita todo (ForEach). con valor -> para en el 1er true (FirstThat)
+    // entrega const KeyNode& (recorrido de solo lectura: mutar seria error de compilacion)
     template<typename It, typename Func, typename... Args>
     KeyNode* traverse(It it, Func func, Args&&... args) {
         for(It e; it != e; ++it) {
-            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
-                call(func, *it, args...);
-            else if(call(func, *it, args...))
+            const KeyNode& node = *it;
+            if constexpr(is_void_v<invoke_result_t<Func, const KeyNode&, Args...>>)
+                call(func, node, args...);
+            else if(call(func, node, args...))
                 return &(*it);
         }
         return nullptr;
@@ -108,13 +110,13 @@ public:
     // los 4 recorridos son envoltorios sobre traverse: cambian iterador (fwd/bwd) y callback (void/valor)
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
-        unique_lock<shared_mutex> lock(m_mtx);
+        shared_lock<shared_mutex> lock(m_mtx);   // recorrido de lectura -> lectores concurrentes
         traverse(forward_iterator::first(&m_root), func, forward<Args>(args)...);
     }
 
     template<typename Func, typename... Args>
     void ReverseForEach(Func func, Args&&... args) {
-        unique_lock<shared_mutex> lock(m_mtx);
+        shared_lock<shared_mutex> lock(m_mtx);
         traverse(backward_iterator::first(&m_root), func, forward<Args>(args)...);
     }
 
@@ -138,7 +140,7 @@ public:
     friend ostream& operator<<(ostream& os, BTree& bt) {
         os << "[";
         bool first = true;
-        bt.ForEach([&](KeyNode& n) { os << (first ? "" : ",") << n; first = false; });
+        bt.ForEach([&](const KeyNode& n) { os << (first ? "" : ",") << n; first = false; });
         return os << "]";
     }
 
