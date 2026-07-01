@@ -38,6 +38,22 @@ struct BTreeData {
     BTreeData() : useCounter(0) {}
 };
 
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const BTreeData<T>& data) {
+    os << "(" << data.key << "->" << data.ref << ")";
+    return os;
+}
+
+template <typename T>
+std::istream& operator>>(std::istream& is, BTreeData<T>& data) {
+    Character p1, arrow1, arrow2, p2;
+    if (is >> p1 >> data.key >> arrow1 >> arrow2 >> data.ref >> p2) {
+        if (p1 != '(' || arrow1 != '-' || arrow2 != '>' || p2 != ')') {
+            is.setstate(std::ios_base::failbit);
+        }
+    }
+    return is;
+}
 
 template <typename Trait>
 class CBTreePage 

@@ -4,6 +4,7 @@
 #define BTREE_H
 
 #include <iostream>
+#include <mutex>
 #include <shared_mutex>
 #include "BTreePage.h"
 #include "traits.h"
@@ -30,9 +31,9 @@ public:
        bool         Remove(const value_type key, Ref ObjID);
        Ref          Search(const value_type key); // Devuelve Ref en lugar de ObjIDType
        
-       size_t       size()   const { return m_NumKeys; }
-       size_t       height() const { return m_Height;  }
-       size_t       GetOrder() const { return m_Order; }
+       size_t       size()   const { std::shared_lock<std::shared_mutex> lock(m_mtx); return m_NumKeys; }
+       size_t       height() const { std::shared_lock<std::shared_mutex> lock(m_mtx); return m_Height;  }
+       size_t       GetOrder() const { std::shared_lock<std::shared_mutex> lock(m_mtx); return m_Order; }
        
        iterator begin() { return iterator(&m_Root, false); }
        iterator end()   { return iterator(&m_Root, true);  }
@@ -44,6 +45,47 @@ public:
 
        template <typename Func, typename... Args>
        ObjectInfo* FirstThat(Func func, Args&&... args); 
+
+       friend std::ostream& operator<<(std::ostream& os, MySelf& tree)
+       {
+           std::shared_lock<std::shared_mutex> lock(tree.m_mtx);
+           os << "[";
+           bool first = true;
+           for (auto it = tree.begin(); it != tree.end(); ++it) {
+               if (!first) os << ", ";
+               os << *it; 
+               first = false;
+           }
+           os << "]";
+           return os;
+       }
+
+       friend std::istream& operator>>(std::istream& is, MySelf& bt)
+       {
+           Character ch;
+           if (!(is >> ch) || ch != '[') { 
+              is.setstate(std::ios_base::failbit); 
+              return is;
+           }
+
+           if ((is >> std::ws).peek() == ']') { 
+              is >> ch; 
+              return is; 
+           }
+           
+           typename MySelf::ObjectInfo temp_data;
+           while (is >> temp_data) {
+              bt.Insert(temp_data.key, temp_data.ref);
+              is >> ch;
+              if (ch == ']') break;
+              if (ch != ',') 
+              { 
+                     is.setstate(std::ios_base::failbit); 
+                     break; 
+              }
+           }
+           return is;
+       }
 
 protected:
        BTPage       m_Root;
@@ -77,6 +119,7 @@ BTree<Trait>::~BTree()
 template <typename Trait>
 bool BTree<Trait>::Insert(const value_type key, Ref ObjID)
 {
+       std::unique_lock<std::shared_mutex> lock(m_mtx);
        bt_ErrorCode error = m_Root.Insert(key, ObjID); // Quienes resuelven los problemas de los hijos son los padres, es decir si un hijo se desborda, el padre lo resuelve
        if (error == bt_duplicate) return false;
        m_NumKeys++;
@@ -91,6 +134,7 @@ bool BTree<Trait>::Insert(const value_type key, Ref ObjID)
 template <typename Trait>
 bool BTree<Trait>::Remove(const value_type key, Ref ObjID)
 {
+       std::unique_lock<std::shared_mutex> lock(m_mtx);
        bt_ErrorCode error = m_Root.Remove(key, ObjID);
        if( error == bt_duplicate || error == bt_nofound ) // posiblemente solo error == bt_nofound, ya que el duplicate no es un error, sino que es un warning
                return false;
@@ -104,6 +148,7 @@ bool BTree<Trait>::Remove(const value_type key, Ref ObjID)
 template <typename Trait>
 Ref BTree<Trait>::Search(const value_type key)
 {
+       std::shared_lock<std::shared_mutex> lock(m_mtx);
        Ref ObjID;
        m_Root.Search(key, ObjID);
        return ObjID;

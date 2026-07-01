@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string>
+#include <fstream>
 #include "BTree.h"
 #include "traits.h"
 #include "../types.h"
@@ -37,6 +38,31 @@ void runBTreeDemo()
             cout << "Encontrado ID = " << ObjID << endl;
         else
             cout << "No encontrado." << endl;
+    }
+
+    cout << "\nProbando operator <<" << endl;
+    const string filename = "btree_backup.txt";
+    std::ofstream outFile(filename);
+    
+    if (outFile.is_open()) {
+        outFile << bt;
+        outFile.close();
+        cout << "Arbol original guardado en " << filename << endl;
+    } else {
+        cout << "Error al crear el archivo." << endl;
+    }
+
+    cout << "\nProbando operator >>" << endl;
+    BTree<MyTreeTrait> bt_restored(BTreeSize);
+    std::ifstream inFile(filename);
+    if (inFile.is_open()) {
+        inFile >> bt_restored;
+        inFile.close();
+        cout << "Arbol restaurado desde '" << filename << "'" << endl;
+        cout << "\nEstado del Arbol Restaurado:" << endl;
+        cout << bt_restored << endl;
+    } else {
+        cout << "Error al abrir el archivo para lectura." << endl;
     }
 }
 
