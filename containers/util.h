@@ -1,7 +1,19 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 #include <ostream>
+#include <functional>    // invoke
+#include <type_traits>   // invoke_result_t, is_void_v
+#include <utility>       // forward
 using namespace std;
+
+// invoca cualquier callable y maneja uniformemente retorno void vs valor
+template<typename Callable, typename... Args>
+decltype(auto) call(Callable func, Args&&... args){
+    if constexpr(is_void_v<invoke_result_t<Callable, Args...>>)
+        invoke(forward<Callable>(func), forward<Args>(args)...);        // void: solo invoca
+    else
+        return invoke(forward<Callable>(func), forward<Args>(args)...); // valor: lo devuelve
+}
 
 template <typename Container>
 void Print(Container& c, ostream &os){

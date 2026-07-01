@@ -22,9 +22,14 @@ void BTreeDemo(ostream& os) {
     // operator<< : [(clave,ref),...] en inorder
     os << "operator<<: " << bt << endl;
 
-    // ForEach variadico: ahora el callback recibe el nodo (clave+ref)
+    // ForEach (forward): el callback recibe el nodo (clave+ref)
     os << "ForEach (inorder): ";
     bt.ForEach([&os](auto& node) { os << node.getData() << " "; });
+    os << endl;
+
+    // ReverseForEach (backward): mismo bucle, en reversa
+    os << "ReverseForEach (inverso): ";
+    bt.ReverseForEach([&os](auto& node) { os << node.getData() << " "; });
     os << endl;
 
     // FirstThat variadico: primer nodo que cumple el predicado

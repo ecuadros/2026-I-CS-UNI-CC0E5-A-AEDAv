@@ -74,19 +74,35 @@ public:
         return true;
     }
 
-    // recorrido inorder con callback variadico (perfect forwarding)
+    // recorrido inorder (forward): callback void -> visita todo. Reusa el unico bucle (firstThat)
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        m_root.forEach(func, forward<Args>(args)...);
+        m_root.firstThat(func, forward<Args>(args)...);   // call maneja que func sea void
     }
 
-    // primer (clave, ref) inorder que cumple el predicado
+    // recorrido inorder inverso (backward): mismo bucle, en reversa
+    template<typename Func, typename... Args>
+    void ReverseForEach(Func func, Args&&... args) {
+        unique_lock<shared_mutex> lock(m_mtx);
+        m_root.rfirstThat(func, forward<Args>(args)...);
+    }
+
+    // primer (clave, ref) inorder que cumple el predicado; mismo bucle (firstThat), callback con valor
     template<typename Pred, typename... Args>
     tuple<value_type, Ref> FirstThat(Pred pred, Args&&... args) {
         shared_lock<shared_mutex> lock(m_mtx);
         KeyNode* p = m_root.firstThat(pred, forward<Args>(args)...);
         if(!p) throw runtime_error("BTree::FirstThat: ninguna clave cumple");
+        return { p->getDataRef(), p->getRef() };
+    }
+
+    // FirstThat en reversa: primer nodo que cumple recorriendo de mayor a menor
+    template<typename Pred, typename... Args>
+    tuple<value_type, Ref> ReverseFirstThat(Pred pred, Args&&... args) {
+        shared_lock<shared_mutex> lock(m_mtx);
+        KeyNode* p = m_root.rfirstThat(pred, forward<Args>(args)...);
+        if(!p) throw runtime_error("BTree::ReverseFirstThat: ninguna clave cumple");
         return { p->getDataRef(), p->getRef() };
     }
 

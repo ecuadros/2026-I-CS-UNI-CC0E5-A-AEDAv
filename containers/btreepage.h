@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <utility>
+#include <type_traits>   // is_void_v, invoke_result_t (para el recorrido unificado)
 #include "../types.h"
 #include "vector.h"
 using namespace std;
@@ -384,30 +385,38 @@ public:
         return bt_ok;
     }
 
-    // recorrido inorder: hijo, clave, hijo, clave, ... ultimo hijo. pasa el nodo (clave+ref)
+    // UNICO recorrido inorder (forward). callback void -> visita todo (ForEach);
+    // callback con valor -> para en el primer nodo "true" (FirstThat). Usa call para ambos.
     template<typename Func, typename... Args>
-    void forEach(Func func, Args&&... args) {
+    KeyNode* firstThat(Func func, Args&&... args) {
         size_t n = m_keys.size();
         for(size_t i = 0; i < n; ++i) {
             Page* c = m_children[i].getData();
-            if(c) c->forEach(func, args...);
-            func(m_keys[i], args...);
+            if(c) if(KeyNode* r = c->firstThat(func, args...)) return r;   // delega en el hijo
+            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
+                call(func, m_keys[i], args...);
+            else if(call(func, m_keys[i], args...))
+                return &m_keys[i];
         }
         Page* last = m_children[n].getData();
-        if(last) last->forEach(func, args...);
+        if(last) if(KeyNode* r = last->firstThat(func, args...)) return r;
+        return nullptr;
     }
 
-    // primer nodo (clave, ref) inorder que cumple el predicado
-    template<typename Pred, typename... Args>
-    KeyNode* firstThat(Pred pred, Args&&... args) {
+    // espejo del anterior: recorrido inorder inverso (backward)
+    template<typename Func, typename... Args>
+    KeyNode* rfirstThat(Func func, Args&&... args) {
         size_t n = m_keys.size();
-        for(size_t i = 0; i < n; ++i) {
-            Page* c = m_children[i].getData();
-            if(c) { KeyNode* r = c->firstThat(pred, args...); if(r) return r; }
-            if(pred(m_keys[i], args...)) return &m_keys[i];
-        }
         Page* last = m_children[n].getData();
-        if(last) { KeyNode* r = last->firstThat(pred, args...); if(r) return r; }
+        if(last) if(KeyNode* r = last->rfirstThat(func, args...)) return r;
+        for(size_t i = n; i-- > 0; ) {
+            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
+                call(func, m_keys[i], args...);
+            else if(call(func, m_keys[i], args...))
+                return &m_keys[i];
+            Page* c = m_children[i].getData();
+            if(c) if(KeyNode* r = c->rfirstThat(func, args...)) return r;
+        }
         return nullptr;
     }
 };
