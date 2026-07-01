@@ -6,15 +6,18 @@
 #include <stdexcept>
 #include <tuple>
 #include <utility>
-#include <type_traits>   // is_void_v, invoke_result_t (para el recorrido unificado)
 #include "../types.h"
 #include "vector.h"
 using namespace std;
 
 enum bt_ErrorCode { bt_ok, bt_overflow, bt_underflow, bt_duplicate, bt_nofound, bt_rootmerged };
 
+// Fwd=true forward (ascendente), Fwd=false backward (descendente), como InorderIter del BinaryTree
+template<typename Trait, bool Fwd> class BTreeIterator;
+
 template<typename Trait>
 class BTreePage {
+    template<typename, bool> friend class BTreeIterator;
 public:
     using value_type = typename Trait::value_type;
     using Comp       = typename Trait::Comp;
@@ -29,6 +32,13 @@ private:
     Comp     m_comp;
     size_t   m_maxKeys;         // capacidad de esta pagina (raiz: 2*orden+1, resto: orden)
     size_t   m_maxKeysForChilds;// capacidad con la que crea hijos (distingue la raiz)
+    Page*    m_parent = nullptr;// padre (raiz = nullptr); lo usa el iterador para subir
+
+    // refija el padre de cada hijo no nulo a esta pagina
+    void reparentChildren() {
+        for(size_t i = 0; i < m_children.size(); ++i)
+            if(Page* c = m_children[i].getData()) c->m_parent = this;
+    }
 
     // ── capacidad ────────────────────────────────────────────────────────────
     size_t minKeys()   { return 2 * m_maxKeys / 3; }
@@ -137,6 +147,7 @@ private:
             source->removeKeyAt(0);
             source->removeChildAt(0);
         }
+        target->reparentChildren();   // el hijo movido cambio de dueño
     }
     // mueve del hermano izquierdo (pos) al derecho (pos+1) rotando por la clave del padre
     void redistributeL2R(size_t pos) {
@@ -150,6 +161,7 @@ private:
             source->m_keys.pop_back();
             source->m_children.pop_back();
         }
+        target->reparentChildren();   // el hijo movido cambio de dueño
     }
 
     // ── B*: split 2 paginas llenas -> 3 ──────────────────────────────────────
@@ -195,6 +207,7 @@ private:
             c3->m_children.push_back(tc[i].getData(), Ref{});
         }
         c3->m_children.push_back(tc[i].getData(), Ref{});
+        c1->reparentChildren(); c2->reparentChildren(); c3->reparentChildren();
     }
 
     // empareja el hijo lleno m_children[pos] con un hermano lleno y los divide 2->3
@@ -218,6 +231,7 @@ private:
         insertKeyAt(pos + 1, oi2.getData(), oi2.getRef());
         insertChildAt(pos + 1, c2);
         m_children[pos + 2].setData(c3);
+        reparentChildren();
     }
 
     bool isFullChild(size_t i) { Page* c = m_children[i].getData(); return c->keyCount() >= c->m_maxKeys; }
@@ -258,6 +272,7 @@ private:
         c2->m_children.push_back(tc[j].getData(), Ref{});
         m_children[pos].setData(c2);
 
+        c1->reparentChildren(); c2->reparentChildren(); reparentChildren();
         return underflow() ? bt_underflow : bt_ok;
     }
 
@@ -280,6 +295,7 @@ private:
             m_children.push_back(tc[i].getData(), Ref{});
         }
         m_children.push_back(tc[total].getData(), Ref{});
+        reparentChildren();
         delete c1; delete c2; delete c3;
         return bt_rootmerged;
     }
@@ -344,6 +360,7 @@ public:
         m_children.push_back(c1, Ref{});
         m_children.push_back(c2, Ref{});
         m_children.push_back(c3, Ref{});
+        reparentChildren();
     }
 
     // busca la clave (clave, ref); lanza si no existe
@@ -385,40 +402,95 @@ public:
         return bt_ok;
     }
 
-    // UNICO recorrido inorder (forward). callback void -> visita todo (ForEach);
-    // callback con valor -> para en el primer nodo "true" (FirstThat). Usa call para ambos.
-    template<typename Func, typename... Args>
-    KeyNode* firstThat(Func func, Args&&... args) {
-        size_t n = m_keys.size();
-        for(size_t i = 0; i < n; ++i) {
-            Page* c = m_children[i].getData();
-            if(c) if(KeyNode* r = c->firstThat(func, args...)) return r;   // delega en el hijo
-            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
-                call(func, m_keys[i], args...);
-            else if(call(func, m_keys[i], args...))
-                return &m_keys[i];
-        }
-        Page* last = m_children[n].getData();
-        if(last) if(KeyNode* r = last->firstThat(func, args...)) return r;
-        return nullptr;
+    // hoja mas a la izquierda del subarbol (para el iterador)
+    Page* leftmostLeaf() {
+        Page* c = this;
+        while(!c->isLeaf()) c = c->m_children[0].getData();
+        return c;
+    }
+    // hoja mas a la derecha del subarbol
+    Page* rightmostLeaf() {
+        Page* c = this;
+        while(!c->isLeaf()) c = c->m_children[c->keyCount()].getData();
+        return c;
+    }
+};
+
+// Iterador inorder (unico recorrido) que navega por m_parent. Fwd = direccion
+template<typename Trait, bool Fwd>
+class BTreeIterator {
+    template<typename> friend class BTree;
+public:
+    using Page    = BTreePage<Trait>;
+    using KeyNode = typename Page::KeyNode;
+
+private:
+    Page*  m_page  = nullptr;   // pagina actual (nullptr = fin del recorrido)
+    size_t m_index = 0;         // clave actual dentro de la pagina
+
+    BTreeIterator(Page* page, size_t index) : m_page(page), m_index(index) {}
+
+    // indice de 'child' dentro de 'parent' (scan lineal)
+    static size_t indexInParent(Page* parent, Page* child) {
+        for(size_t i = 0; i < parent->m_children.size(); ++i)
+            if(parent->m_children[i].getData() == child) return i;
+        return parent->m_children.size();
     }
 
-    // espejo del anterior: recorrido inorder inverso (backward)
-    template<typename Func, typename... Args>
-    KeyNode* rfirstThat(Func func, Args&&... args) {
-        size_t n = m_keys.size();
-        Page* last = m_children[n].getData();
-        if(last) if(KeyNode* r = last->rfirstThat(func, args...)) return r;
-        for(size_t i = n; i-- > 0; ) {
-            if constexpr(is_void_v<invoke_result_t<Func, KeyNode&, Args...>>)
-                call(func, m_keys[i], args...);
-            else if(call(func, m_keys[i], args...))
-                return &m_keys[i];
-            Page* c = m_children[i].getData();
-            if(c) if(KeyNode* r = c->rfirstThat(func, args...)) return r;
+    // sucesor: baja al hijo derecho (mas izq) o sube por m_parent al ancestro pendiente
+    void advanceForward() {
+        Page* right = m_page->m_children[m_index + 1].getData();
+        if(right) { m_page = right->leftmostLeaf(); m_index = 0; return; }
+        if(++m_index < m_page->keyCount()) return;
+        Page* cur = m_page;
+        while(cur->m_parent) {
+            size_t j = indexInParent(cur->m_parent, cur);
+            if(j < cur->m_parent->keyCount()) { m_page = cur->m_parent; m_index = j; return; }
+            cur = cur->m_parent;
         }
-        return nullptr;
+        m_page = nullptr;   // fin
     }
+
+    // predecesor: espejo del anterior (hijo izquierdo mas der, o sube por m_parent)
+    void advanceBackward() {
+        Page* left = m_page->m_children[m_index].getData();
+        if(left) { m_page = left->rightmostLeaf(); m_index = m_page->keyCount() - 1; return; }
+        if(m_index > 0) { --m_index; return; }
+        Page* cur = m_page;
+        while(cur->m_parent) {
+            size_t j = indexInParent(cur->m_parent, cur);
+            if(j > 0) { m_page = cur->m_parent; m_index = j - 1; return; }
+            cur = cur->m_parent;
+        }
+        m_page = nullptr;
+    }
+
+public:
+    BTreeIterator() = default;   // fin (m_page == nullptr)
+
+    // primer nodo: mas a la izquierda si Fwd, mas a la derecha si no. vacio -> fin
+    static BTreeIterator first(Page* root) {
+        if(root->keyCount() == 0) return BTreeIterator();
+        if constexpr(Fwd) return BTreeIterator(root->leftmostLeaf(), 0);
+        else { Page* leaf = root->rightmostLeaf(); return BTreeIterator(leaf, leaf->keyCount() - 1); }
+    }
+
+    KeyNode& operator*()  { return m_page->m_keys[m_index]; }
+    KeyNode* operator->() { return &m_page->m_keys[m_index]; }
+
+    BTreeIterator& operator++() {
+        if constexpr(Fwd) advanceForward();
+        else              advanceBackward();
+        return *this;
+    }
+    BTreeIterator operator++(int) { BTreeIterator t = *this; ++(*this); return t; }
+
+    // iguales si ambos son fin, o misma pagina y mismo indice
+    bool operator!=(const BTreeIterator& o) const {
+        if(m_page == nullptr || o.m_page == nullptr) return m_page != o.m_page;
+        return m_page != o.m_page || m_index != o.m_index;
+    }
+    bool operator==(const BTreeIterator& o) const { return !(*this != o); }
 };
 
 #endif // __BTREEPAGE_H__

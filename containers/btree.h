@@ -11,6 +11,7 @@
 #include <utility>
 #include "../types.h"
 #include "btreepage.h"
+#include "util.h"
 using namespace std;
 
 #define DEFAULT_BTREE_ORDER 3
@@ -24,9 +25,11 @@ class BTree {
 public:
     using value_type = typename Trait::value_type;
     using Comp       = typename Trait::Comp;
-    using Page       = BTreePage<Trait>;
-    using KeyNode    = typename Page::KeyNode;
-    using MySelf     = BTree<Trait>;
+    using Page             = BTreePage<Trait>;
+    using KeyNode          = typename Page::KeyNode;
+    using forward_iterator  = BTreeIterator<Trait, true>;    // ascendente
+    using backward_iterator = BTreeIterator<Trait, false>;   // descendente
+    using MySelf           = BTree<Trait>;
 
 private:
     Page   m_root;
@@ -36,7 +39,7 @@ private:
     mutable shared_mutex m_mtx;
 
 public:
-    // raiz con capacidad 2*orden+1; los hijos se crean con 'orden' (B* del profe)
+    // raiz con capacidad 2*orden+1; los hijos se crean con 'orden'
     BTree(size_t order = DEFAULT_BTREE_ORDER)
         : m_root(2 * order + 1), m_order(order), m_height(1), m_numKeys(0) {
         m_root.setMaxKeysForChilds(order);
@@ -74,36 +77,52 @@ public:
         return true;
     }
 
-    // recorrido inorder (forward): callback void -> visita todo. Reusa el unico bucle (firstThat)
+    // range-based for. lock momentaneo (solo para construir el iterador)
+    forward_iterator  begin()  { shared_lock<shared_mutex> lock(m_mtx); return forward_iterator::first(&m_root);  }
+    forward_iterator  end()    { return forward_iterator(); }
+    backward_iterator rbegin() { shared_lock<shared_mutex> lock(m_mtx); return backward_iterator::first(&m_root); }
+    backward_iterator rend()   { return backward_iterator(); }
+
+    // vista inversa: for(auto& n : bt.reversed())
+    struct ReverseView {
+        MySelf& m_bt;
+        backward_iterator begin() { return m_bt.rbegin(); }
+        backward_iterator end()   { return m_bt.rend();   }
+    };
+    ReverseView reversed() { return ReverseView{*this}; }
+
+    // recorrido forward: callback void -> visita todo (call lo maneja)
     template<typename Func, typename... Args>
     void ForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        m_root.firstThat(func, forward<Args>(args)...);   // call maneja que func sea void
+        for(forward_iterator it = forward_iterator::first(&m_root), e; it != e; ++it)
+            call(func, *it, forward<Args>(args)...);
     }
 
-    // recorrido inorder inverso (backward): mismo bucle, en reversa
+    // recorrido backward
     template<typename Func, typename... Args>
     void ReverseForEach(Func func, Args&&... args) {
         unique_lock<shared_mutex> lock(m_mtx);
-        m_root.rfirstThat(func, forward<Args>(args)...);
+        for(backward_iterator it = backward_iterator::first(&m_root), e; it != e; ++it)
+            call(func, *it, forward<Args>(args)...);
     }
 
-    // primer (clave, ref) inorder que cumple el predicado; mismo bucle (firstThat), callback con valor
+    // primer (clave, ref) forward que cumple el predicado; callback con valor
     template<typename Pred, typename... Args>
     tuple<value_type, Ref> FirstThat(Pred pred, Args&&... args) {
         shared_lock<shared_mutex> lock(m_mtx);
-        KeyNode* p = m_root.firstThat(pred, forward<Args>(args)...);
-        if(!p) throw runtime_error("BTree::FirstThat: ninguna clave cumple");
-        return { p->getDataRef(), p->getRef() };
+        for(forward_iterator it = forward_iterator::first(&m_root), e; it != e; ++it)
+            if(call(pred, *it, forward<Args>(args)...)) return { it->getDataRef(), it->getRef() };
+        throw runtime_error("BTree::FirstThat: ninguna clave cumple");
     }
 
-    // FirstThat en reversa: primer nodo que cumple recorriendo de mayor a menor
+    // FirstThat de mayor a menor
     template<typename Pred, typename... Args>
     tuple<value_type, Ref> ReverseFirstThat(Pred pred, Args&&... args) {
         shared_lock<shared_mutex> lock(m_mtx);
-        KeyNode* p = m_root.rfirstThat(pred, forward<Args>(args)...);
-        if(!p) throw runtime_error("BTree::ReverseFirstThat: ninguna clave cumple");
-        return { p->getDataRef(), p->getRef() };
+        for(backward_iterator it = backward_iterator::first(&m_root), e; it != e; ++it)
+            if(call(pred, *it, forward<Args>(args)...)) return { it->getDataRef(), it->getRef() };
+        throw runtime_error("BTree::ReverseFirstThat: ninguna clave cumple");
     }
 
     // imprime [(clave,ref),...] recorriendo con ForEach (reusa VectorNode::operator<<)

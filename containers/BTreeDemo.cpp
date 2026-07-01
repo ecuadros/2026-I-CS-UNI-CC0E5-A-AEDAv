@@ -22,12 +22,17 @@ void BTreeDemo(ostream& os) {
     // operator<< : [(clave,ref),...] en inorder
     os << "operator<<: " << bt << endl;
 
-    // ForEach (forward): el callback recibe el nodo (clave+ref)
-    os << "ForEach (inorder): ";
-    bt.ForEach([&os](auto& node) { os << node.getData() << " "; });
+    // range-based for (forward)
+    os << "for(auto& n : bt) (inorder): ";
+    for(const auto& node : bt) os << node.getData() << " ";
     os << endl;
 
-    // ReverseForEach (backward): mismo bucle, en reversa
+    // range-based for con la vista inversa
+    os << "for(auto& n : bt.reversed()) (inverso): ";
+    for(const auto& node : bt.reversed()) os << node.getData() << " ";
+    os << endl;
+
+    // ReverseForEach (backward)
     os << "ReverseForEach (inverso): ";
     bt.ReverseForEach([&os](auto& node) { os << node.getData() << " "; });
     os << endl;
