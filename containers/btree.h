@@ -93,7 +93,7 @@ public:
 
 private:
     // UNICO bucle. callback void -> visita todo (ForEach). con valor -> para en el 1er true (FirstThat)
-    // entrega const KeyNode& (recorrido de solo lectura: mutar seria error de compilacion)
+    // entrega const KeyNode& (recorrido de solo lectura)
     template<typename It, typename Func, typename... Args>
     KeyNode* traverse(It it, Func func, Args&&... args) {
         for(It e; it != e; ++it) {
