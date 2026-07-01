@@ -30,7 +30,6 @@ public:
     bool operator==(const BTreeIteratorBase& o) const {
         if (m_stack.empty() && o.m_stack.empty()) return true;
         if (m_stack.empty() || o.m_stack.empty()) return false;
-        // Dos iteradores son iguales si están en la misma página y en el mismo índice
         return m_stack.back().first == o.m_stack.back().first &&
                m_stack.back().second == o.m_stack.back().second;
     }
@@ -47,7 +46,6 @@ class BTreeIterator : public BTreeIteratorBase<TreeType> {
 private:
     void Descend(Page* p) {
         while (p && p->m_KeyCount > 0) {
-            // Evaluado en tiempo de compilación: 0 si es Forward, el último si es Backward
             size_t i = IsForward ? 0 : p->m_KeyCount - 1;
             this->m_stack.push_back({p, i});
             p = IsForward ? p->m_SubPages[0] : p->m_SubPages[p->m_KeyCount];
@@ -65,7 +63,6 @@ public:
         Page* page = this->m_stack.back().first;
         size_t i   = this->m_stack.back().second;
         
-        // Magia condicional estática
         Page* child = IsForward ? page->m_SubPages[i + 1] : page->m_SubPages[i];
         this->m_stack.back().second = IsForward ? i + 1 : i - 1; 
         
