@@ -14,7 +14,8 @@ const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzK
 
 const T1 BTreeOrder = 3;
 
-void TestBasicos(){
+void BTreeDemo(){
+    // 1) Insert / Print / Search / Remove
     cout << "\nTEST BASICO (Insert/Print/Search/Remove)" << endl;
     BTree<BTreeTrait<char, long>> bt(BTreeOrder);
 
@@ -40,51 +41,47 @@ void TestBasicos(){
         else
             cout << "No encontre " << keys3[i] << endl;
     }
-
     cout << "Arbol tras remover (quedan " << bt.size() << " claves):" << endl;
     bt.Print(cout);
-}
 
-void TestIteradores(){
+    // 2) Iteradores forward/backward + ForEach/FirstThat
     cout << "\nTEST DE ITERADORES (forward/backward) Y ForEach/FirstThat" << endl;
-    BTree<BTreeTrait<char, long>> bt(BTreeOrder);
+    BTree<BTreeTrait<char, long>> bt2(BTreeOrder);
     for( T1 i = 0; keys1[i]; i++ )
-        bt.Insert(keys1[i], i*i);
+        bt2.Insert(keys1[i], i*i);
 
     cout << "Forward  (ascendente): ";
-    for( auto it = bt.begin(); it != bt.end(); ++it )
+    for( auto it = bt2.begin(); it != bt2.end(); ++it )
         cout << it->key;
     cout << endl;
 
     cout << "Backward (descendente): ";
-    for( auto it = bt.rbegin(); it != bt.rend(); ++it )
+    for( auto it = bt2.rbegin(); it != bt2.rend(); ++it )
         cout << it->key;
     cout << endl;
 
     T1 vocales = 0;
-    bt.ForEach([](auto &info, T1 *pCount){
+    bt2.ForEach([](auto &info, T1 *pCount){
         if( string("AEIOUaeiou").find(info.key) != string::npos )
             (*pCount)++;
         return true; // seguir recorriendo
     }, &vocales);
     cout << "Cantidad de vocales en el arbol: " << vocales << endl;
 
-    auto *primeraMayus = bt.FirstThat([](auto &info){
+    auto *primeraMayus = bt2.FirstThat([](auto &info){
         return info.key >= 'A' && info.key <= 'Z';
     });
     if( primeraMayus )
         cout << "Primera mayuscula en orden ascendente: " << primeraMayus->key << endl;
-}
 
-void TestConcurrencia(){
+    // 3) Concurrencia (shared_mutex)
     cout << "\nTEST DE CONCURRENCIA" << endl;
-    BTree<BTreeTrait<T1>> bt(BTreeOrder);
-
+    BTree<BTreeTrait<T1>> bt3(BTreeOrder);
     const T1 N_HILOS = 5;
     const T1 N_POR_HILO = 200;
-    auto worker = [&bt](T1 hiloId){
+    auto worker = [&bt3](T1 hiloId){
         for( T1 i = 0; i < N_POR_HILO; i++ )
-            bt.Insert(hiloId*N_POR_HILO + i, hiloId);
+            bt3.Insert(hiloId*N_POR_HILO + i, hiloId);
     };
 
     vector<thread> hilos;
@@ -94,28 +91,19 @@ void TestConcurrencia(){
         h.join();
 
     cout << "Se lanzaron " << N_HILOS << " hilos insertando " << N_POR_HILO << " claves cada uno." << endl;
-    cout << "Tamano del arbol (esperado " << N_HILOS*N_POR_HILO << "): " << bt.size() << endl;
-    if( bt.size() == N_HILOS*N_POR_HILO )
+    cout << "Tamano del arbol (esperado " << N_HILOS*N_POR_HILO << "): " << bt3.size() << endl;
+    if( bt3.size() == N_HILOS*N_POR_HILO )
         cout << "ESTADO: EXITO - El shared_mutex protegio el arbol correctamente." << endl;
     else
         cout << "ESTADO: FALLO - Hubo corrupcion de datos." << endl;
-}
 
-void TestOperadores(){
+    // 4) Operadores << / >>
     cout << "\nTEST DE OPERADORES (<</>>)" << endl;
-    BTree<BTreeTrait<T1>> bt(BTreeOrder);
-
+    BTree<BTreeTrait<T1>> bt4(BTreeOrder);
     cout << "Simulando lectura desde formato: [(10,100),(20,200),(30,300)]" << endl;
     istringstream simuladorInput("[(10,100),(20,200),(30,300)]");
-    simuladorInput >> bt;
+    simuladorInput >> bt4;
+    cout << "Arbol luego de la lectura (operator<<): " << bt4 << endl;
 
-    cout << "Arbol luego de la lectura (operator<<): " << bt << endl;
-}
-
-void BTreeDemo(){
-    TestBasicos();
-    TestIteradores();
-    TestConcurrencia();
-    TestOperadores();
     cout << "\n=== FIN DE LAS PRUEBAS DE BTree ===" << endl;
 }
