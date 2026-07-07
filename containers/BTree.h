@@ -4,29 +4,74 @@
 #define BTREE_H
 
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <vector>
 #include "BTreePage.h"
-
+#include "traits.h"
 #define DEFAULT_BTREE_ORDER 3
 
-template <typename keyType, typename ObjIDType = long>
-class BTree 
-// this is the full version of the BTree
+using namespace std;
+template <typename Trait>
+class BTree
 {
-       typedef CBTreePage <keyType, ObjIDType> BTNode;// useful shorthand
-       /*struct ObjectInfo
-       {
-               keyType first;
-               long    second;
-               ObjectInfo *&operator->() { return this; }
-       };*/
-
 public:
-       //typedef ObjectInfo iterator;
-       typedef typename BTNode::lpfnForEach2    lpfnForEach2;
-       typedef typename BTNode::lpfnForEach3    lpfnForEach3;
-       typedef typename BTNode::lpfnFirstThat2  lpfnFirstThat2;
-       typedef typename BTNode::lpfnFirstThat3  lpfnFirstThat3;
-       typedef typename BTNode::ObjectInfo      ObjectInfo;
+       using value_type = typename Trait::value_type;
+       using ref_type   = typename Trait::ref_type;
+       using compare_type = typename Trait::compare_type;
+       using keyType   = value_type;
+       using ObjIDType = ref_type;
+       using Comp      = compare_type;
+       using BTNode    = CBTreePage<Trait>;
+       using ObjectInfo     = typename BTNode::ObjectInfo;
+       using node_type      = ObjectInfo;
+       class Iterator
+       {
+              shared_ptr<vector<ObjectInfo>> m_Items;
+              long m_Pos;
+              int m_Step;
+
+              bool IsEnd() const
+              {
+                     return !m_Items || m_Pos < 0 || m_Pos >= (long)m_Items->size();
+              }
+
+       public:
+              Iterator() : m_Items(nullptr), m_Pos(-1), m_Step(1) {}
+              Iterator(shared_ptr<vector<ObjectInfo>> items, long pos, int step)
+                     : m_Items(items), m_Pos(pos), m_Step(step) {}
+
+              ObjectInfo& operator*() { return (*m_Items)[m_Pos]; }
+              ObjectInfo* operator->() { return &(*m_Items)[m_Pos]; }
+
+              Iterator& operator++()
+              {
+                     if( IsEnd() )
+                            return *this;
+                     m_Pos += m_Step;
+                     if( IsEnd() )
+                     {
+                            m_Items.reset();
+                            m_Pos = -1;
+                     }
+                     return *this;
+              }
+
+              friend bool operator==(const Iterator &a, const Iterator &b)
+              {
+                     if( a.IsEnd() && b.IsEnd() )
+                            return true;
+                     return a.m_Items == b.m_Items && a.m_Pos == b.m_Pos;
+              }
+
+              friend bool operator!=(const Iterator &a, const Iterator &b)
+              {
+                     return !(a == b);
+              }
+       };
+       using iterator = Iterator;
+       using reverse_iterator = Iterator;
 
 public:
        BTree(int order = DEFAULT_BTREE_ORDER, bool unique = true);
@@ -34,18 +79,26 @@ public:
        //int           Open (char * name, int mode);
        //int           Create (char * name, int mode);
        //int           Close ();
-       bool            Insert (const keyType key, const int ObjID);
-       bool            Remove (const keyType key, const int ObjID);
+       bool            Insert (const keyType key, const ObjIDType ObjID);
+       bool            Remove (const keyType key, const ObjIDType ObjID);
        ObjIDType       Search (const keyType key);
-       long            size()  { return m_NumKeys; }
-       long            height() { return m_Height;      }
-       long            GetOrder() { return m_Order;     }
+       long            size()  { shared_lock<shared_mutex> lock(m_Mtx); return m_NumKeys; }
+       long            height() { shared_lock<shared_mutex> lock(m_Mtx); return m_Height;  }
+       long            GetOrder() { shared_lock<shared_mutex> lock(m_Mtx); return m_Order; }
 
        void            Print (ostream &os);
-       void            ForEach( lpfnForEach2 lpfn, void *pExtra1 );
-       void            ForEach( lpfnForEach3 lpfn, void *pExtra1, void *pExtra2);
-       ObjectInfo*     FirstThat( lpfnFirstThat2 lpfn, void *pExtra1 );
-       ObjectInfo*     FirstThat( lpfnFirstThat3 lpfn, void *pExtra1, void *pExtra2);
+       template <typename Func, typename... Args>
+       void            ForEach(Func func, Args&&... args);
+       template <typename Func, typename... Args>
+       ObjectInfo*     FirstThat(Func func, Args&&... args);
+       template <typename Func, typename... Args>
+       void            ForEachReverse(Func func, Args&&... args);
+       template <typename Func, typename... Args>
+       ObjectInfo*     FirstThatReverse(Func func, Args&&... args);
+       iterator        begin();
+       iterator        end();
+       reverse_iterator rbegin();
+       reverse_iterator rend();
        //typedef               ObjectInfo iterator;
 
 protected:
@@ -54,28 +107,30 @@ protected:
        int             m_Order;   // order of tree
        long            m_NumKeys; // number of keys
        bool            m_Unique;  // Accept the elements only once ?
+       mutable shared_mutex m_Mtx; // concurrencia
 };
 
 const int MaxHeight = 5;
-template <typename keyType, typename ObjIDType>
-BTree<keyType, ObjIDType>::BTree(int order, bool unique)
-                               : m_Unique(unique),
+template <typename Trait>
+BTree<Trait>::BTree(int order, bool unique)
+                               : m_Root(2 * order  + 1, unique),
+                                 m_Height(1),
                                  m_Order(order),
-                                 m_Root(2 * order  + 1, unique),
-                                 m_NumKeys(0)
+                                 m_NumKeys(0),
+                                 m_Unique(unique)
 {
        m_Root.SetMaxKeysForChilds(order);
-       m_Height = 1;
 }
-
-template <typename keyType, typename ObjIDType>
-BTree<keyType, ObjIDType>::~BTree()
+template <typename Trait>
+BTree<Trait>::~BTree()
 {
 }
 
-template <typename keyType, typename ObjIDType>
-bool BTree<keyType, ObjIDType>::Insert(const keyType key, const int ObjID)
+template <typename Trait>
+bool BTree<Trait>::Insert(const typename BTree<Trait>::keyType key,
+                          const typename BTree<Trait>::ObjIDType ObjID)
 {
+       unique_lock<shared_mutex> lock(m_Mtx);
        bt_ErrorCode error = m_Root.Insert(key, ObjID);
        if( error == bt_duplicate )
                return false;
@@ -88,9 +143,11 @@ bool BTree<keyType, ObjIDType>::Insert(const keyType key, const int ObjID)
        return true;
 }
 
-template <typename keyType, typename ObjIDType>
-bool BTree<keyType, ObjIDType>::Remove (const keyType key, const int ObjID)
+template <typename Trait>
+bool BTree<Trait>::Remove (const typename BTree<Trait>::keyType key,
+                           const typename BTree<Trait>::ObjIDType ObjID)
 {
+       unique_lock<shared_mutex> lock(m_Mtx);
        bt_ErrorCode error = m_Root.Remove(key, ObjID);
        if( error == bt_duplicate || error == bt_nofound )
                return false;
@@ -101,44 +158,153 @@ bool BTree<keyType, ObjIDType>::Remove (const keyType key, const int ObjID)
        return true;
 }
 
-template <typename keyType, typename ObjIDType>
-ObjIDType BTree<keyType, ObjIDType>::Search (const keyType key)
+template <typename Trait>
+typename BTree<Trait>::ObjIDType
+BTree<Trait>::Search (const typename BTree<Trait>::keyType key)
 {
+       shared_lock<shared_mutex> lock(m_Mtx);
        ObjIDType ObjID = -1;
        m_Root.Search(key, ObjID);
        return ObjID;
 }
 
 
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::ForEach(lpfnForEach2 lpfn, void *pExtra1)
+template <typename Trait>
+template <typename Func, typename... Args>
+void BTree<Trait>::ForEach(Func func, Args&&... args)
 {
-       m_Root.ForEach(lpfn, 0, pExtra1);
+       shared_lock<shared_mutex> lock(m_Mtx);
+       m_Root.ForEach(func, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::ForEach(lpfnForEach3 lpfn, void *pExtra1, void *pExtra2)
+template <typename Trait>
+template <typename Func, typename... Args>
+typename BTree<Trait>::ObjectInfo *
+BTree<Trait>::FirstThat(Func func, Args&&... args)
 {
-       m_Root.ForEach(lpfn, 0, pExtra1, pExtra2);
+       shared_lock<shared_mutex> lock(m_Mtx);
+       return m_Root.FirstThat(func, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-typename BTree<keyType, ObjIDType>::ObjectInfo *
-BTree<keyType, ObjIDType>::FirstThat(lpfnFirstThat2 lpfn, void *pExtra1)
+template <typename Trait>
+template <typename Func, typename... Args>
+void BTree<Trait>::ForEachReverse(Func func, Args&&... args)
 {
-       return m_Root.FirstThat(lpfn, 0, pExtra1);
+       shared_lock<shared_mutex> lock(m_Mtx);
+       m_Root.ForEachReverse(func, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-typename BTree<keyType, ObjIDType>::ObjectInfo *
-BTree<keyType, ObjIDType>::FirstThat(lpfnFirstThat3 lpfn, void *pExtra1, void *pExtra2)
+template <typename Trait>
+template <typename Func, typename... Args>
+typename BTree<Trait>::ObjectInfo *
+BTree<Trait>::FirstThatReverse(Func func, Args&&... args)
 {
-       return m_Root.FirstThat(lpfn, 0, pExtra1, pExtra2);
+       shared_lock<shared_mutex> lock(m_Mtx);
+       return m_Root.FirstThatReverse(func, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::Print(ostream &os){
+template <typename Trait>
+typename BTree<Trait>::iterator BTree<Trait>::begin()
+{
+       auto items = make_shared<vector<ObjectInfo>>();
+       ForEach([items](ObjectInfo &info, int) {
+              items->push_back(info);
+       });
+       if( items->empty() )
+              return end();
+       return iterator(items, 0, 1);
+}
+
+template <typename Trait>
+typename BTree<Trait>::iterator BTree<Trait>::end()
+{
+       return iterator();
+}
+
+template <typename Trait>
+typename BTree<Trait>::reverse_iterator BTree<Trait>::rbegin()
+{
+       auto items = make_shared<vector<ObjectInfo>>();
+       ForEach([items](ObjectInfo &info, int) {
+              items->push_back(info);
+       });
+       if( items->empty() )
+              return rend();
+       return reverse_iterator(items, (long)items->size() - 1, -1);
+}
+
+template <typename Trait>
+typename BTree<Trait>::reverse_iterator BTree<Trait>::rend()
+{
+       return reverse_iterator();
+}
+
+template <typename Trait>
+void BTree<Trait>::Print(ostream &os){
+       shared_lock<shared_mutex> lock(m_Mtx);
        m_Root.Print(os);
+}
+
+// operator <<
+template <typename Trait>
+ostream& operator<<(ostream& os, BTree<Trait>& tree)
+{
+       bool first = true;
+       os << "[";
+       tree.ForEach([&](typename BTree<Trait>::ObjectInfo &info, int) {
+               if( !first )
+                       os << " ";
+               os << "(" << info.key << "," << info.ObjID << ")";
+               first = false;
+       });
+       os << "]";
+       return os;
+}
+
+// operator >>
+template <typename Trait>
+istream& operator>>(istream& is, BTree<Trait>& tree)
+{
+       using keyType = typename BTree<Trait>::keyType;
+       using ObjIDType = typename BTree<Trait>::ObjIDType;
+
+       char openList;
+       if( !(is >> openList) || openList != '[' )
+       {
+               is.setstate(ios_base::failbit);
+               return is;
+       }
+
+       is >> ws;
+       if( is.peek() == ']' )
+       {
+               is.get();
+               return is;
+       }
+
+       while( is )
+       {
+               char openEntry, comma, closeEntry;
+               keyType key;
+               ObjIDType objID;
+
+               if( !(is >> openEntry >> key >> comma >> objID >> closeEntry) ||
+                   openEntry != '(' || comma != ',' || closeEntry != ')' )
+               {
+                       is.setstate(ios_base::failbit);
+                       return is;
+               }
+
+               tree.Insert(key, objID);
+
+               is >> ws;
+               if( is.peek() == ']' )
+               {
+                       is.get();
+                       return is;
+               }
+       }
+       return is;
 }
 
 

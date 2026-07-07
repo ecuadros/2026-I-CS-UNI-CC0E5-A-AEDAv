@@ -1,8 +1,16 @@
-//#include <iostream.h>
-#include <time.h>
-#include <stdlib.h>
+#include <cctype>
+#include <functional>
+#include <iostream>
+#include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 #include "BTree.h"
+#include "traits.h"
+
+using Trait = BTreeTrait<char, Ref>;
+using BT = BTree<Trait>;
+using namespace std;
 
 //const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
 const char * keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
@@ -10,17 +18,64 @@ const char * keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
 
 const int BTreeSize = 3;
-void main(int argc, char * argv[], char * envp[])
+static void concurrencyWorker(BT& tree, Ref workerId)
 {
-       int result, i;
-       BTree <char> bt (BTreeSize);
-       for (i = 0; keys1[i]; i++)
+       for( int i = 0; i < 60; i++ )
+               tree.Insert(char('a' + ((workerId * 7 + i) % 26)), workerId);
+}
+
+int main()
+{
+       BT bt (BTreeSize);
+       string keys = keys1;
+       for (size_t i = 0; i < keys.size(); i++)
        {
                //cout<<"Inserting "<<keys1[i]<<endl;
-               result = bt.Insert(keys1[i], i*i);
+               bt.Insert(keys[i], Ref(i*i));
                //bt.Print(cout);
        }
+       cout << "BTree\n";
        bt.Print(cout);
+       cout << "size=" << bt.size() << " height=" << bt.height()
+            << " order=" << bt.GetOrder() << "\n";
+
+       cout << "search Z=" << bt.Search('Z') << "\n";
+
+       int letters = 0;
+       bt.ForEach([](BT::ObjectInfo &info, int, int &count) {
+               if( isalpha((unsigned char)info.key) )
+                       count++;
+       }, letters);
+       cout << "letters=" << letters << "\n";
+
+       BT::ObjectInfo *found = bt.FirstThat([](BT::ObjectInfo &info, int, char target) {
+               return info.key == target;
+       }, 'Q');
+       cout << "firstThat Q=" << (found ? found->ObjID : -1) << "\n";
+
+       string forward;
+       for( auto &info : bt )
+               forward += info.key;
+       cout << "forward=" << forward << "\n";
+
+       string backward;
+       for( auto it = bt.rbegin(); it != bt.rend(); ++it )
+               backward += it->key;
+       cout << "backward=" << backward << "\n";
+
+       stringstream ss;
+       ss << bt;
+       BT copy(BTreeSize);
+       ss >> copy;
+       cout << "operator io search Z=" << copy.Search('Z') << "\n";
+
+       BT concurrent(BTreeSize);
+       vector<thread> threads;
+       for( Ref i = 0; i < 4; i++ )
+               threads.emplace_back(concurrencyWorker, ref(concurrent), i + 1);
+       for( auto &thread : threads )
+               thread.join();
+       cout << "concurrent size=" << concurrent.size() << "\n";
        /*for (i = 0; keys2[i]; i++)
        {
                cout << "Searching " << keys2[i] << " ";
@@ -43,7 +98,7 @@ void main(int argc, char * argv[], char * envp[])
        }
        bt.Print(cout);
        cout.flush();*/
-       return 1;
+       return 0;
 }
 
 
