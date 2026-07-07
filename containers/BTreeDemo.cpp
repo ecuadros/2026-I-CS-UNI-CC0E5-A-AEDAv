@@ -1,113 +1,121 @@
-//#include <iostream.h>
-#include <time.h>
-#include <stdlib.h>
-#include <string>
+#include <iostream>
+#include <sstream>
+#include <thread>
+#include <vector>
+
+#include "../types.h"
 #include "BTree.h"
 
-//const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
+using namespace std;
+
 const char * keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
 const char * keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
 
-const int BTreeSize = 3;
-void main(int argc, char * argv[], char * envp[])
-{
-       int result, i;
-       BTree <char> bt (BTreeSize);
-       for (i = 0; keys1[i]; i++)
-       {
-               //cout<<"Inserting "<<keys1[i]<<endl;
-               result = bt.Insert(keys1[i], i*i);
-               //bt.Print(cout);
-       }
-       bt.Print(cout);
-       /*for (i = 0; keys2[i]; i++)
-       {
-               cout << "Searching " << keys2[i] << " ";
-               long ObjID = bt.Search(keys2[i]);
-               if( ObjID != -1 )
-                       cout << "Achei " << keys2[i] << " ID = " << ObjID << endl;
-               else
-                       cout <<"Nao achei!" << keys2[i] << endl;
-       }*/
-       /*cout.flush();
+const T1 BTreeOrder = 3;
 
-       for (i = 0; keys3[i]; i++)
-       {
-               cout << "Removing " << keys3[i] << " ";
-               if( bt.Remove(keys3[i], -1) )
-                       cout << keys3[i] << " removido !" << endl;
-               else
-                       cout <<"Nao achei!" << keys3[i] << endl;
-               bt.Print(cout);
-       }
-       bt.Print(cout);
-       cout.flush();*/
-       return 1;
+void TestBasicos(){
+    cout << "\nTEST BASICO (Insert/Print/Search/Remove)" << endl;
+    BTree<BTreeTrait<char, long>> bt(BTreeOrder);
+
+    for( T1 i = 0; keys1[i]; i++ )
+        bt.Insert(keys1[i], i*i);
+
+    cout << "Arbol tras insertar " << bt.size() << " claves:" << endl;
+    bt.Print(cout);
+
+    for( T1 i = 0; keys2[i]; i++ )
+    {
+        long ObjID = bt.Search(keys2[i]);
+        if( ObjID != -1 )
+            cout << "Encontre " << keys2[i] << " ID = " << ObjID << endl;
+        else
+            cout << "No encontre " << keys2[i] << endl;
+    }
+
+    for( T1 i = 0; keys3[i]; i++ )
+    {
+        if( bt.Remove(keys3[i], -1) )
+            cout << keys3[i] << " removido!" << endl;
+        else
+            cout << "No encontre " << keys3[i] << endl;
+    }
+
+    cout << "Arbol tras remover (quedan " << bt.size() << " claves):" << endl;
+    bt.Print(cout);
 }
 
+void TestIteradores(){
+    cout << "\nTEST DE ITERADORES (forward/backward) Y ForEach/FirstThat" << endl;
+    BTree<BTreeTrait<char, long>> bt(BTreeOrder);
+    for( T1 i = 0; keys1[i]; i++ )
+        bt.Insert(keys1[i], i*i);
 
+    cout << "Forward  (ascendente): ";
+    for( auto it = bt.begin(); it != bt.end(); ++it )
+        cout << it->key;
+    cout << endl;
 
+    cout << "Backward (descendente): ";
+    for( auto it = bt.rbegin(); it != bt.rend(); ++it )
+        cout << it->key;
+    cout << endl;
 
+    T1 vocales = 0;
+    bt.ForEach([](auto &info, T1 *pCount){
+        if( string("AEIOUaeiou").find(info.key) != string::npos )
+            (*pCount)++;
+        return true; // seguir recorriendo
+    }, &vocales);
+    cout << "Cantidad de vocales en el arbol: " << vocales << endl;
 
+    auto *primeraMayus = bt.FirstThat([](auto &info){
+        return info.key >= 'A' && info.key <= 'Z';
+    });
+    if( primeraMayus )
+        cout << "Primera mayuscula en orden ascendente: " << primeraMayus->key << endl;
+}
 
+void TestConcurrencia(){
+    cout << "\nTEST DE CONCURRENCIA" << endl;
+    BTree<BTreeTrait<T1>> bt(BTreeOrder);
 
+    const T1 N_HILOS = 5;
+    const T1 N_POR_HILO = 200;
+    auto worker = [&bt](T1 hiloId){
+        for( T1 i = 0; i < N_POR_HILO; i++ )
+            bt.Insert(hiloId*N_POR_HILO + i, hiloId);
+    };
 
+    vector<thread> hilos;
+    for( T1 h = 0; h < N_HILOS; h++ )
+        hilos.emplace_back(worker, h);
+    for( auto &h : hilos )
+        h.join();
 
-/*const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const char * keys2="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const int BTreeSize = 3;
-main (int argc, char * argv)
-{
-       //__int64 li;
-       BTree <__int64> bt (BTreeSize);
-       for (register int i = 0; i < 1000000; i++)
-       {
-               //cout<<"Inserting "<<keys[i]<<endl;
-               bt.Insert(i, i-1);
-               //bt.Print(cout);
-       }
+    cout << "Se lanzaron " << N_HILOS << " hilos insertando " << N_POR_HILO << " claves cada uno." << endl;
+    cout << "Tamano del arbol (esperado " << N_HILOS*N_POR_HILO << "): " << bt.size() << endl;
+    if( bt.size() == N_HILOS*N_POR_HILO )
+        cout << "ESTADO: EXITO - El shared_mutex protegio el arbol correctamente." << endl;
+    else
+        cout << "ESTADO: FALLO - Hubo corrupcion de datos." << endl;
+}
 
-       for (i = 0; i < 1000; i++)
-       {
-               __int64 key = 975000+(::rand()%50000);
-               //cout << "Searching " << (long)key << " ";
-               long ObjID = bt.Search(key);
-               if( ObjID != -1 )
-                       cout << "Achei " << (long)key << " ID = " << ObjID << endl;
-               else
-                       cout <<"  Nao achei!" << (long)key << endl;
-       }
-       cout.flush();
+void TestOperadores(){
+    cout << "\nTEST DE OPERADORES (<</>>)" << endl;
+    BTree<BTreeTrait<T1>> bt(BTreeOrder);
 
-       return 1;
-}*/
+    cout << "Simulando lectura desde formato: [(10,100),(20,200),(30,300)]" << endl;
+    istringstream simuladorInput("[(10,100),(20,200),(30,300)]");
+    simuladorInput >> bt;
 
+    cout << "Arbol luego de la lectura (operator<<): " << bt << endl;
+}
 
-
-/*const int BTreeSize = 3;
-main (int argc, char * argv)
-{
-       int result, i;
-       BTree <LONGLONG> bt(BTreeSize);
-       result = bt.Create ("ernesto3-string-btree-start.dat",ios::in|ios::out);
-       if (!result) { cout<<"Please delete testbt.dat"<<endl;return 0; }
-       srand( (unsigned)time( NULL ) );
-       LARGE_INTEGER key;
-       for (i = 0; i < 1000000; i++)
-       {
-               //cout<<"Inserting "<<keys[i]<<endl;
-               char strTmp[50];
-               key.LowPart = rand();
-               key.HighPart = rand();
-               std::string str(strTmp);
-               result = bt.Insert(key.QuadPart, i);
-               //bt.Print(cout);
-               if( i % 100000 == 0 )
-               {       cout << i << endl; cout.flush();        }
-       }
-       //cout << "Searching D " << bt.Search();
-       //bt.Search(1,1);
-       cout.flush();
-       return 1;
-}*/
+void BTreeDemo(){
+    TestBasicos();
+    TestIteradores();
+    TestConcurrencia();
+    TestOperadores();
+    cout << "\n=== FIN DE LAS PRUEBAS DE BTree ===" << endl;
+}
