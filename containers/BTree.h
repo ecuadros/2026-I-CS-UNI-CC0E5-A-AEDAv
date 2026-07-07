@@ -10,6 +10,8 @@
 
 #define DEFAULT_BTREE_ORDER 3
 
+/* Estado comun del iterador: una pila de (pagina, indice de clave).
+Una pagina tiene varias claves y varios hijos, asi que un solo puntero no alcanza para saber "cual sigue"; por eso guardamos la pila.*/
 template <typename TreeType>
 class btree_iterator_base
 {
@@ -27,6 +29,7 @@ public:
        ObjectInfo& operator*()  const { return m_stack.back().page->m_Keys[m_stack.back().idx]; }
        ObjectInfo* operator->() const { return &m_stack.back().page->m_Keys[m_stack.back().idx]; }
 
+       // nivel de la pagina actual, sirve para indentar en Print
        T1 level() const { return (T1)m_stack.size() - 1; }
 
        friend bool operator==(const btree_iterator_base &a, const btree_iterator_base &b)
@@ -39,6 +42,8 @@ public:
 };
 
 
+// Un solo iterador para ambos sentidos: IsForward=true recorre ascendente,
+// false descendente. La direccion decide los indices, no se duplica la clase.
 template <typename TreeType, bool IsForward>
 class btree_iterator : public btree_iterator_base<TreeType>
 {
@@ -46,18 +51,21 @@ class btree_iterator : public btree_iterator_base<TreeType>
        using BTNode = typename Base::BTNode;
        using MySelf = btree_iterator<TreeType, IsForward>;
 
+       // primer indice a visitar en una pagina: el izquierdo o el derecho
        T1 first_index(BTNode *page) const
        {
                if constexpr (IsForward) return 0;
                else                     return page->NumberOfKeys() - 1;
        }
 
+       // la pagina del tope ya no tiene mas claves para dar?
        bool exhausted(const typename Base::Frame &f) const
        {
                if constexpr (IsForward) return f.idx >= f.page->NumberOfKeys();
                else                     return f.idx < 0;
        }
 
+       // baja hasta la hoja apilando el hijo extremo de cada pagina
        void push_extreme(BTNode *page)
        {
                while( page )
@@ -68,6 +76,7 @@ class btree_iterator : public btree_iterator_base<TreeType>
                }
        }
 
+       // desapila las paginas ya agotadas hasta encontrar una pendiente
        void cleanup()
        {
                while( !this->m_stack.empty() && exhausted(this->m_stack.back()) )
@@ -83,6 +92,7 @@ public:
                cleanup();
        }
 
+       // avanza: baja al hijo siguiente si existe, si no sigue en esta pagina
        MySelf& operator++()
        {
                auto frame = this->m_stack.back();
@@ -112,8 +122,7 @@ class BTree
        };*/
 
 public:
-       // Public so btree_iterator_base/btree_iterator<BTree<Trait>, ...> can
-       // name them (they are not friends of BTree, only of CBTreePage).
+       // publicos para que el iterador pueda nombrarlos
        using BTNode     = CBTreePage<Trait>;
        typedef typename BTNode::ObjectInfo      ObjectInfo;
 
@@ -141,6 +150,7 @@ public:
        backward_iterator rend()   { shared_lock<shared_mutex> lock(m_mtx); return rend_impl(); }
 
 
+       // recorre todas las claves llamando func en cada una
        template <typename Func, typename... Args>
        void ForEach(Func func, Args&&... args)
        {
@@ -148,6 +158,7 @@ public:
                ForEach_impl(func, std::forward<Args>(args)...);
        }
 
+       // reutiliza el bucle de ForEach y corta al primer match
        template <typename Pred, typename... Args>
        ObjectInfo* FirstThat(Pred pred, Args&&... args)
        {
@@ -205,11 +216,13 @@ public:
        }
 
 protected:
+       // versiones sin lock (los llamadores ya tienen el lock tomado)
        forward_iterator  begin_impl()  { return forward_iterator(&m_Root); }
        forward_iterator  end_impl()    { return forward_iterator(); }
        backward_iterator rbegin_impl() { return backward_iterator(&m_Root); }
        backward_iterator rend_impl()   { return backward_iterator(); }
 
+       // el unico bucle que usan ForEach y FirstThat
        template <typename Func, typename... Args>
        void ForEach_impl(Func func, Args&&... args)
        {
@@ -223,7 +236,7 @@ protected:
        T1                      m_Order;   // order of tree
        T1                      m_NumKeys; // number of keys
        bool                    m_Unique;  // Accept the elements only once ?
-       mutable shared_mutex    m_mtx;     // reader-writer lock: shared for reads, unique for writes
+       mutable shared_mutex    m_mtx;     // lock lectura/escritura
 };
 
 const T1 MaxHeight = 5;

@@ -58,9 +58,7 @@ class CBTreePage
 
        friend class BTree<Trait>;
 
-       // btree_iterator_base/btree_iterator (defined in BTree.h, with
-       // TreeType = BTree<Trait>) walk m_Keys/m_SubPages/NumberOfKeys()
-       // directly, so both need friend access here.
+       // el iterador (en BTree.h) recorre m_Keys/m_SubPages directo
        template <typename TreeType>
        friend class btree_iterator_base;
 
