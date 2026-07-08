@@ -6,6 +6,7 @@
 #include <iostream>
 #include <shared_mutex>
 #include <mutex>
+#include <type_traits>
 #include "BTreePage.h"
 
 #define DEFAULT_BTREE_ORDER 3
@@ -28,9 +29,6 @@ public:
 
        ObjectInfo& operator*()  const { return m_stack.back().page->m_Keys[m_stack.back().idx]; }
        ObjectInfo* operator->() const { return &m_stack.back().page->m_Keys[m_stack.back().idx]; }
-
-       // nivel de la pagina actual, sirve para indentar en Print
-       T1 level() const { return (T1)m_stack.size() - 1; }
 
        friend bool operator==(const btree_iterator_base &a, const btree_iterator_base &b)
        {
@@ -142,51 +140,37 @@ public:
        T1              height() { shared_lock<shared_mutex> lock(m_mtx); return m_Height; }
        T1              GetOrder() { shared_lock<shared_mutex> lock(m_mtx); return m_Order; }
 
-       void            Print (ostream &os);
+       forward_iterator  begin()  { return forward_iterator(&m_Root); }
+       forward_iterator  end()    { return forward_iterator(); }
+       backward_iterator rbegin() { return backward_iterator(&m_Root); }
+       backward_iterator rend()   { return backward_iterator(); }
 
-       forward_iterator  begin()  { shared_lock<shared_mutex> lock(m_mtx); return begin_impl(); }
-       forward_iterator  end()    { shared_lock<shared_mutex> lock(m_mtx); return end_impl(); }
-       backward_iterator rbegin() { shared_lock<shared_mutex> lock(m_mtx); return rbegin_impl(); }
-       backward_iterator rend()   { shared_lock<shared_mutex> lock(m_mtx); return rend_impl(); }
-
-
-       // recorre todas las claves llamando func en cada una
        template <typename Func, typename... Args>
-       void ForEach(Func func, Args&&... args)
+       auto ForEach(Func func, Args&&... args)
        {
+               using result_t = invoke_result_t<Func, ObjectInfo&, Args...>;
                shared_lock<shared_mutex> lock(m_mtx);
-               ForEach_impl(func, std::forward<Args>(args)...);
-       }
-
-       // reutiliza el bucle de ForEach y corta al primer match
-       template <typename Pred, typename... Args>
-       ObjectInfo* FirstThat(Pred pred, Args&&... args)
-       {
-               shared_lock<shared_mutex> lock(m_mtx);
-               ObjectInfo *found = nullptr;
-               ForEach_impl([&](ObjectInfo &info, auto&&... rest) -> bool {
-                       if( pred(info, rest...) )
-                       {
-                               found = &info;
-                               return false;
-                       }
-                       return true;
-               }, std::forward<Args>(args)...);
-               return found;
+               for( auto it = begin(); it != end(); ++it )
+               {
+                       if constexpr (is_void_v<result_t>)
+                               func(*it, args...);
+                       else if( func(*it, args...) )
+                               return &(*it);
+               }
+               if constexpr (!is_void_v<result_t>)
+                       return (ObjectInfo*)nullptr;
        }
 
        // Operadores I/O
        friend ostream& operator<<(ostream& os, BTree& tree) {
-               shared_lock<shared_mutex> lock(tree.m_mtx);
                os << "[";
                bool first = true;
-               for( auto it = tree.begin_impl(); it != tree.end_impl(); ++it )
-               {
+               tree.ForEach([&](auto &info){
                        if( !first )
                                os << ",";
-                       os << "(" << it->key << "," << it->ObjID << ")";
+                       os << "(" << info.key << "," << info.ObjID << ")";
                        first = false;
-               }
+               });
                os << "]";
                return os;
        }
@@ -216,21 +200,6 @@ public:
        }
 
 protected:
-       // versiones sin lock (los llamadores ya tienen el lock tomado)
-       forward_iterator  begin_impl()  { return forward_iterator(&m_Root); }
-       forward_iterator  end_impl()    { return forward_iterator(); }
-       backward_iterator rbegin_impl() { return backward_iterator(&m_Root); }
-       backward_iterator rend_impl()   { return backward_iterator(); }
-
-       // el unico bucle que usan ForEach y FirstThat
-       template <typename Func, typename... Args>
-       void ForEach_impl(Func func, Args&&... args)
-       {
-               for( auto it = begin_impl() ; it != end_impl() ; ++it )
-                       if( !func(*it, args...) )
-                               break;
-       }
-
        BTNode                  m_Root;
        T1                      m_Height;  // height of tree
        T1                      m_Order;   // order of tree
@@ -293,18 +262,6 @@ typename BTree<Trait>::ObjIDType BTree<Trait>::Search (const keyType key)
        ObjIDType ObjID = -1;
        m_Root.Search(key, ObjID);
        return ObjID;
-}
-
-template <typename Trait>
-void BTree<Trait>::Print(ostream &os)
-{
-       shared_lock<shared_mutex> lock(m_mtx);
-       for( auto it = begin_impl(); it != end_impl(); ++it )
-       {
-               for( T1 i = 0; i < it.level(); i++ )
-                       os << "\t";
-               os << it->key << "->" << it->ObjID << "\n";
-       }
 }
 
 #endif
