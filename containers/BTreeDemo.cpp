@@ -4,31 +4,37 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 #include "BTree.h"
 #include "traits.h"
 
-using Trait = BTreeTrait<char, Ref>;
+using DemoValue = string::value_type;
+using DemoText = string;
+using DemoCount = Ref;
+using DemoByte = make_unsigned<DemoValue>::type;
+using Trait = BTreeTrait<DemoValue, Ref>;
 using BT = BTree<Trait>;
 using namespace std;
 
 //const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const char * keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
-const char * keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
+const DemoText keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
+const DemoText keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const DemoText keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
 
-const int BTreeSize = 3;
+const DemoCount BTreeSize = 3;
+
 static void concurrencyWorker(BT& tree, Ref workerId)
 {
-       for( int i = 0; i < 60; i++ )
-               tree.Insert(char('a' + ((workerId * 7 + i) % 26)), workerId);
+       for( DemoCount i = 0; i < 60; i++ )
+               tree.Insert(DemoValue('a' + ((workerId * 7 + i) % 26)), workerId);
 }
 
 int main()
 {
        BT bt (BTreeSize);
-       string keys = keys1;
-       for (size_t i = 0; i < keys.size(); i++)
+       DemoText keys = keys1;
+       for (DemoText::size_type i = 0; i < keys.size(); i++)
        {
                //cout<<"Inserting "<<keys1[i]<<endl;
                bt.Insert(keys[i], Ref(i*i));
@@ -41,14 +47,14 @@ int main()
 
        cout << "search Z=" << bt.Search('Z') << "\n";
 
-       int letters = 0;
-       bt.ForEach([](BT::ObjectInfo &info, int, int &count) {
-               if( isalpha((unsigned char)info.key) )
+       DemoCount letters = 0;
+       bt.ForEach([](BT::ObjectInfo &info, BT::LevelType, DemoCount &count) {
+               if( isalpha(DemoByte(info.key)) )
                        count++;
        }, letters);
        cout << "letters=" << letters << "\n";
 
-       BT::ObjectInfo *found = bt.FirstThat([](BT::ObjectInfo &info, int, char target) {
+       BT::ObjectInfo *found = bt.FirstThat([](BT::ObjectInfo &info, BT::LevelType, DemoValue target) {
                return info.key == target;
        }, 'Q');
        cout << "firstThat Q=" << (found ? found->ObjID : -1) << "\n";
