@@ -4,146 +4,381 @@
 #define BTREE_H
 
 #include <iostream>
+#include <sstream>
+#include <mutex>
+#include <shared_mutex>
 #include "BTreePage.h"
+#include "traits.h"
+#include "general_iterator.h"
+#include "../types.h"
 
 #define DEFAULT_BTREE_ORDER 3
 
-template <typename keyType, typename ObjIDType = long>
+template <typename Trait> class btree_forward_iterator;
+template <typename Trait> class btree_backward_iterator;
+
+template <typename Trait>
 class BTree 
 // this is the full version of the BTree
 {
-       typedef CBTreePage <keyType, ObjIDType> BTNode;// useful shorthand
-       /*struct ObjectInfo
-       {
-               keyType first;
-               long    second;
-               ObjectInfo *&operator->() { return this; }
-       };*/
+       typedef BTreePage <Trait> BTNode;
+
+       using keyType    = typename Trait::value_type;
+       using ObjIDType  = typename Trait::objIdType;
+       using Comp       = typename Trait::Comp;
 
 public:
-       //typedef ObjectInfo iterator;
-       typedef typename BTNode::lpfnForEach2    lpfnForEach2;
-       typedef typename BTNode::lpfnForEach3    lpfnForEach3;
-       typedef typename BTNode::lpfnFirstThat2  lpfnFirstThat2;
-       typedef typename BTNode::lpfnFirstThat3  lpfnFirstThat3;
-       typedef typename BTNode::ObjectInfo      ObjectInfo;
+         typedef typename BTNode::ObjectInfo      ObjectInfo;
+         typedef ObjectInfo                       Node;
+         typedef ObjectInfo                       value_type;
+
+         using forward_iterator  = btree_forward_iterator<Trait>;
+         friend forward_iterator;
+         using backward_iterator = btree_backward_iterator<Trait>;
+         friend backward_iterator;
 
 public:
-       BTree(int order = DEFAULT_BTREE_ORDER, bool unique = true);
-       ~BTree();
-       //int           Open (char * name, int mode);
-       //int           Create (char * name, int mode);
-       //int           Close ();
-       bool            Insert (const keyType key, const int ObjID);
-       bool            Remove (const keyType key, const int ObjID);
-       ObjIDType       Search (const keyType key);
-       long            size()  { return m_NumKeys; }
-       long            height() { return m_Height;      }
-       long            GetOrder() { return m_Order;     }
+        BTree(T1 order = DEFAULT_BTREE_ORDER, TBool unique = true);
+        ~BTree();
+        TBool            Insert (const keyType key, const ObjIDType ObjID);
+        TBool            Remove (const keyType key, const ObjIDType ObjID);
+        ObjIDType       Search (const keyType key);
+        TLong            size()  { shared_lock<shared_mutex> lock(m_mtx); return m_NumKeys; }
+        T1            height() { shared_lock<shared_mutex> lock(m_mtx); return m_Height; }
+        T1            GetOrder() { shared_lock<shared_mutex> lock(m_mtx); return m_Order; }
 
-       void            Print (ostream &os);
-       void            ForEach( lpfnForEach2 lpfn, void *pExtra1 );
-       void            ForEach( lpfnForEach3 lpfn, void *pExtra1, void *pExtra2);
-       ObjectInfo*     FirstThat( lpfnFirstThat2 lpfn, void *pExtra1 );
-       ObjectInfo*     FirstThat( lpfnFirstThat3 lpfn, void *pExtra1, void *pExtra2);
-       //typedef               ObjectInfo iterator;
+        void            Print (ostream &os);
+        template <typename Func, typename... Args>
+        void            ForEach(Func&& lpfn, Args&&... args);
+        template <typename Func, typename... Args>
+        ObjectInfo*     FirstThat(Func&& lpfn, Args&&... args);
+        template <typename Func, typename... Args>
+        ObjectInfo*     UnifiedLoop(Func&& lpfn, Args&&... args);
+
+         forward_iterator  begin();
+         forward_iterator  end();
+         backward_iterator rbegin();
+         backward_iterator rend();
+
+         friend ostream& operator<<(ostream& os, BTree<Trait>& tree) {
+             shared_lock<shared_mutex> lock(tree.m_mtx);
+             for (auto item: tree)
+                 os << item << endl;
+             return os;
+         }
+
+         friend istream& operator>>(istream& is, BTree<Trait>& tree) {
+             keyType key; ObjIDType objID;
+             TChar colon;
+             while (is >> key >> colon >> objID) {
+                 if (colon != ':') { is.setstate(ios::failbit); break; }
+                 tree.Insert(key, objID);
+             }
+             return is;
+         }
 
 protected:
-       BTNode          m_Root;
-       int             m_Height;  // height of tree
-       int             m_Order;   // order of tree
-       long            m_NumKeys; // number of keys
-       bool            m_Unique;  // Accept the elements only once ?
+        BTNode          m_Root;
+       T1             m_Height;  // height of tree
+       T1             m_Order;   // order of tree
+       TLong            m_NumKeys; // number of keys
+       TBool            m_Unique;  // Accept the elements only once ?
+       mutable shared_mutex m_mtx;
 };
 
-const int MaxHeight = 5;
-template <typename keyType, typename ObjIDType>
-BTree<keyType, ObjIDType>::BTree(int order, bool unique)
-                               : m_Unique(unique),
-                                 m_Order(order),
-                                 m_Root(2 * order  + 1, unique),
-                                 m_NumKeys(0)
+const T1 MaxHeight = 5;
+template <typename Trait>
+BTree<Trait>::BTree(T1 order, TBool unique)
+                                : m_Root(2 * order  + 1, unique),
+                                  m_Height(1),
+                                  m_Order(order),
+                                  m_NumKeys(0),
+                                  m_Unique(unique)
 {
-       m_Root.SetMaxKeysForChilds(order);
-       m_Height = 1;
+    m_Root.SetMaxKeysForChilds(order);
 }
 
-template <typename keyType, typename ObjIDType>
-BTree<keyType, ObjIDType>::~BTree()
+template <typename Trait>
+BTree<Trait>::~BTree()
 {
 }
 
-template <typename keyType, typename ObjIDType>
-bool BTree<keyType, ObjIDType>::Insert(const keyType key, const int ObjID)
+template <typename Trait>
+bool BTree<Trait>::Insert(const keyType key, const ObjIDType ObjID)
 {
+       unique_lock<shared_mutex> lock(m_mtx);
        bt_ErrorCode error = m_Root.Insert(key, ObjID);
        if( error == bt_duplicate )
-               return false;
+            return false;
        m_NumKeys++;
        if( error == bt_overflow )
        {
-               m_Root.SplitRoot();
-               m_Height++;
+            m_Root.SplitRoot();
+            m_Height++;
        }
        return true;
 }
 
-template <typename keyType, typename ObjIDType>
-bool BTree<keyType, ObjIDType>::Remove (const keyType key, const int ObjID)
+template <typename Trait>
+bool BTree<Trait>::Remove (const keyType key, const ObjIDType ObjID)
 {
-       bt_ErrorCode error = m_Root.Remove(key, ObjID);
-       if( error == bt_duplicate || error == bt_nofound )
-               return false;
-       m_NumKeys--;
+    unique_lock<shared_mutex> lock(m_mtx);
+    bt_ErrorCode error = m_Root.Remove(key, ObjID);
+    if( error == bt_duplicate || error == bt_nofound )
+        return false;
+    m_NumKeys--;
 
-       if( error == bt_rootmerged )
-               m_Height--;
-       return true;
+    if( error == bt_rootmerged )
+        m_Height--;
+    return true;
 }
 
-template <typename keyType, typename ObjIDType>
-ObjIDType BTree<keyType, ObjIDType>::Search (const keyType key)
+template <typename Trait>
+typename BTree<Trait>::ObjIDType BTree<Trait>::Search (const keyType key)
 {
-       ObjIDType ObjID = -1;
-       m_Root.Search(key, ObjID);
-       return ObjID;
+    unique_lock<shared_mutex> lock(m_mtx);
+    ObjIDType ObjID = -1;
+    m_Root.Search(key, ObjID);
+    return ObjID;
 }
 
 
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::ForEach(lpfnForEach2 lpfn, void *pExtra1)
+template <typename Trait>
+template <typename Func, typename... Args>
+void BTree<Trait>::ForEach(Func&& lpfn, Args&&... args)
 {
-       m_Root.ForEach(lpfn, 0, pExtra1);
+    shared_lock<shared_mutex> lock(m_mtx);
+    m_Root.ForEach(lpfn, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::ForEach(lpfnForEach3 lpfn, void *pExtra1, void *pExtra2)
+template <typename Trait>
+template <typename Func, typename... Args>
+typename BTree<Trait>::ObjectInfo *
+BTree<Trait>::FirstThat(Func&& lpfn, Args&&... args)
 {
-       m_Root.ForEach(lpfn, 0, pExtra1, pExtra2);
+    shared_lock<shared_mutex> lock(m_mtx);
+    return m_Root.FirstThat(lpfn, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-typename BTree<keyType, ObjIDType>::ObjectInfo *
-BTree<keyType, ObjIDType>::FirstThat(lpfnFirstThat2 lpfn, void *pExtra1)
+template <typename Trait>
+template <typename Func, typename... Args>
+typename BTree<Trait>::ObjectInfo *
+BTree<Trait>::UnifiedLoop(Func&& lpfn, Args&&... args)
 {
-       return m_Root.FirstThat(lpfn, 0, pExtra1);
+    shared_lock<shared_mutex> lock(m_mtx);
+    return m_Root.UnifiedLoop(lpfn, 0, args...);
 }
 
-template <typename keyType, typename ObjIDType>
-typename BTree<keyType, ObjIDType>::ObjectInfo *
-BTree<keyType, ObjIDType>::FirstThat(lpfnFirstThat3 lpfn, void *pExtra1, void *pExtra2)
-{
-       return m_Root.FirstThat(lpfn, 0, pExtra1, pExtra2);
-}
-
-template <typename keyType, typename ObjIDType>
-void BTree<keyType, ObjIDType>::Print(ostream &os){
-       m_Root.Print(os);
+template <typename Trait>
+void BTree<Trait>::Print(ostream &os){
+    m_Root.Print(os);
 }
 
 
+// Forward iterator
+template <typename Trait>
+class btree_forward_iterator : public general_iterator<BTree<Trait>, btree_forward_iterator<Trait>> {
+public:
+    using Parent  = general_iterator<BTree<Trait>, btree_forward_iterator<Trait>>;
+    using MySelf  = btree_forward_iterator<Trait>;
+    using BTPage  = BTreePage<Trait>;
+
+private:
+    struct Frame { BTPage *page; T1 keyIndex; };
+
+    static constexpr T1 MAX_H = MaxHeight;
+    Frame   m_stack[MAX_H];
+    T1      m_depth;
+    BTPage *m_curPage;
+    T1      m_curIndex;
+
+    void doPush(BTPage *p, T1 ki) { m_stack[++m_depth] = {p, ki}; }
+    Frame  doPop()                { return m_stack[m_depth--]; }
+
+    void goToFirst() {
+        BTree<Trait> *tree = static_cast<BTree<Trait>*>(this->m_pContainer);
+        BTPage *page = &tree->m_Root;
+        m_depth = -1;
+
+        if (page->GetNumberOfKeys() == 0) {
+            m_curPage = nullptr; m_curIndex = -1;
+            this->m_pNode = nullptr;
+            return;
+        }
+
+        while (page->GetSubPage(0)) {
+            doPush(page, 0);
+            page = page->GetSubPage(0);
+        }
+        m_curPage = page;
+        m_curIndex = 0;
+        this->m_pNode = &page->GetKeyRef(0);
+    }
+
+    void advance() {
+        if (!this->m_pNode) return;
+
+        BTPage *page = m_curPage;
+        T1 idx = m_curIndex;
+
+        if (page->GetSubPage(idx + 1)) {
+            if (idx + 1 < page->GetNumberOfKeys())
+                doPush(page, idx + 1);
+
+            page = page->GetSubPage(idx + 1);
+            while (page->GetSubPage(0)) {
+                doPush(page, 0);
+                page = page->GetSubPage(0);
+            }
+            m_curPage  = page;
+            m_curIndex = 0;
+            this->m_pNode = &page->GetKeyRef(0);
+        } else if (idx + 1 < page->GetNumberOfKeys()) {
+            m_curIndex = idx + 1;
+            this->m_pNode = &page->GetKeyRef(m_curIndex);
+        } else {
+            if (m_depth < 0) {
+                this->m_pNode = nullptr;
+                return;
+            }
+            Frame f = doPop();
+            m_curPage  = f.page;
+            m_curIndex = f.keyIndex;
+            this->m_pNode = &f.page->GetKeyRef(f.keyIndex);
+        }
+    }
+
+public:
+    btree_forward_iterator() : Parent(nullptr, nullptr) {
+        m_depth = -1; m_curPage = nullptr; m_curIndex = -1;
+    }
+    explicit btree_forward_iterator(BTree<Trait> *tree) : Parent(tree, nullptr) {
+        goToFirst();
+    }
+
+    MySelf& operator++() { advance(); return *this; }
+};
 
 
+// Backward iterator
+template <typename Trait>
+class btree_backward_iterator : public general_iterator<BTree<Trait>, btree_backward_iterator<Trait>> {
+public:
+    using Parent  = general_iterator<BTree<Trait>, btree_backward_iterator<Trait>>;
+    using MySelf  = btree_backward_iterator<Trait>;
+    using BTPage  = BTreePage<Trait>;
 
+private:
+    struct Frame { BTPage *page; T1 keyIndex; };
+
+    static constexpr T1 MAX_H = MaxHeight;
+    Frame   m_stack[MAX_H];
+    T1      m_depth;
+    BTPage *m_curPage;
+    T1      m_curIndex;
+
+    void doPush(BTPage *p, T1 ki) { m_stack[++m_depth] = {p, ki}; }
+    Frame  doPop()                { return m_stack[m_depth--]; }
+
+    void goToLast() {
+        BTree<Trait> *tree = static_cast<BTree<Trait>*>(this->m_pContainer);
+        BTPage *page = &tree->m_Root;
+        m_depth = -1;
+
+        if (page->GetNumberOfKeys() == 0) {
+            m_curPage = nullptr; m_curIndex = -1;
+            this->m_pNode = nullptr;
+            return;
+        }
+
+        while (true) {
+            T1 n = page->GetNumberOfKeys();
+            if (page->GetSubPage(n)) {
+                doPush(page, n - 1);
+                page = page->GetSubPage(n);
+            } else {
+                break;
+            }
+        }
+        m_curPage  = page;
+        m_curIndex = page->GetNumberOfKeys() - 1;
+        this->m_pNode = &page->GetKeyRef(m_curIndex);
+    }
+
+    void retreat() {
+        if (!this->m_pNode) return;
+
+        BTPage *page = m_curPage;
+        T1 idx = m_curIndex;
+
+        if (page->GetSubPage(idx)) {
+            if (idx - 1 >= 0)
+                doPush(page, idx - 1);
+
+            page = page->GetSubPage(idx);
+            while (true) {
+                T1 n = page->GetNumberOfKeys();
+                if (page->GetSubPage(n)) {
+                    doPush(page, n - 1);
+                    page = page->GetSubPage(n);
+                } else {
+                    break;
+                }
+            }
+            m_curPage  = page;
+            m_curIndex = page->GetNumberOfKeys() - 1;
+            this->m_pNode = &page->GetKeyRef(m_curIndex);
+        } else if (idx - 1 >= 0) {
+            m_curIndex = idx - 1;
+            this->m_pNode = &page->GetKeyRef(m_curIndex);
+        } else {
+            while (m_depth >= 0) {
+                Frame f = doPop();
+                if (f.keyIndex >= 0) {
+                    m_curPage  = f.page;
+                    m_curIndex = f.keyIndex;
+                    this->m_pNode = &f.page->GetKeyRef(f.keyIndex);
+                    return;
+                }
+            }
+            this->m_pNode = nullptr;
+        }
+    }
+
+public:
+    btree_backward_iterator() : Parent(nullptr, nullptr) {
+        m_depth = -1; m_curPage = nullptr; m_curIndex = -1;
+    }
+    explicit btree_backward_iterator(BTree<Trait> *tree) : Parent(tree, nullptr) {
+        goToLast();
+    }
+
+    MySelf& operator++() { retreat(); return *this; }
+};
+
+
+//  begin 
+template <typename Trait>
+typename BTree<Trait>::forward_iterator BTree<Trait>::begin() {
+    return forward_iterator(this);
+}
+
+// end
+template <typename Trait>
+typename BTree<Trait>::forward_iterator BTree<Trait>::end() {
+    return forward_iterator();
+}
+
+// rbegin
+template <typename Trait>
+typename BTree<Trait>::backward_iterator BTree<Trait>::rbegin() {
+    return backward_iterator(this);
+}
+
+// rend
+template <typename Trait>
+typename BTree<Trait>::backward_iterator BTree<Trait>::rend() {
+    return backward_iterator();
+}
 
 #endif

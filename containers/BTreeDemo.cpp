@@ -2,112 +2,153 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string>
+#include <sstream>
 #include "BTree.h"
+#include "traits.h"
+#include "../types.h"
 
-//const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const char * keys1 = "D1XJ2xTg8zKL9AhijOPQcEowRSp0NbW567BUfCqrs4FdtYZakHIuvGV3eMylmn";
-const char * keys2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const char * keys3 = "DYZakHIUwxVJ203ejOP9Qc8AdtuEop1XvTRghSNbW567BfiCqrs4FGMyzKLlmn";
+const TChar * keys1 = "D1XJ2xTg8zKL9Ahij";
+const TChar * keys2 = "0123456789ABCDEFG";
+const TChar * keys3 = "DYZakHIMwxVJ2K3ej";
 
-const int BTreeSize = 3;
-void main(int argc, char * argv[], char * envp[])
+
+void DemoBTree()
 {
-       int result, i;
-       BTree <char> bt (BTreeSize);
-       for (i = 0; keys1[i]; i++)
-       {
-               //cout<<"Inserting "<<keys1[i]<<endl;
-               result = bt.Insert(keys1[i], i*i);
-               //bt.Print(cout);
-       }
-       bt.Print(cout);
-       /*for (i = 0; keys2[i]; i++)
-       {
-               cout << "Searching " << keys2[i] << " ";
-               long ObjID = bt.Search(keys2[i]);
-               if( ObjID != -1 )
-                       cout << "Achei " << keys2[i] << " ID = " << ObjID << endl;
-               else
-                       cout <<"Nao achei!" << keys2[i] << endl;
-       }*/
-       /*cout.flush();
+    size_t i;
+    const T1 BTreeSize = 3;
 
-       for (i = 0; keys3[i]; i++)
-       {
-               cout << "Removing " << keys3[i] << " ";
-               if( bt.Remove(keys3[i], -1) )
-                       cout << keys3[i] << " removido !" << endl;
-               else
-                       cout <<"Nao achei!" << keys3[i] << endl;
-               bt.Print(cout);
-       }
-       bt.Print(cout);
-       cout.flush();*/
-       return 1;
+    // Ascending BTree
+    cout<<"===== ASCENDING B-TREE ====="<<endl;
+    BTree<BTreeAscendingTrait<TChar>> btAsc(BTreeSize);
+
+    // Insert
+    cout<<"\n===== INSERT ====="<<endl;
+    for (i = 0; keys1[i]; i++)
+    {
+        cout << "Insertando " << keys1[i] << endl;
+        btAsc.Insert(keys1[i], i*i);
+    }
+
+    btAsc.Print(cout);
+
+    // Descending BTree
+    cout << "\n===== DESCENDING B-TREE =====" << endl;
+    BTree<BTreeDescendingTrait<TChar>> btDesc(BTreeSize);
+    
+    // Insert
+    cout<<"\n===== INSERT ====="<<endl;
+    for (i = 0; keys1[i]; i++)
+    {
+        cout << "Insertando " << keys1[i] << endl;
+        btDesc.Insert(keys1[i], i*i);
+    }
+
+    btDesc.Print(cout);
+
+    // Search
+    cout<<"\n===== SEARCH ====="<<endl;
+    for (i = 0; keys2[i]; i++)
+    {
+        cout << "Buscando " << keys2[i] << " ";
+        TLong ObjID = btAsc.Search(keys2[i]);
+        if( ObjID != -1 )
+            cout << "Encontrado " << keys2[i] << " ID = " << ObjID << endl;
+        else
+            cout << ", No encontrado " << keys2[i] << endl;
+    }
+
+    cout.flush();
+
+    // Remove
+    /* for (i = 0; keys3[i]; i++)
+    {
+        cout << "Removiendo " << keys3[i] << ", ";
+        if( btAsc.Remove(keys3[i], -1) )
+            cout << keys3[i] << " removido!" << endl;
+        else
+            cout << "No encontrado " << keys3[i] << endl;
+        btAsc.Print(cout);
+    } */
+
+    // ForEach
+    cout<<"\n=== FOREACH (ASC) ==="<<endl;
+    btAsc.ForEach(
+        [](decltype(btAsc)::ObjectInfo &info, T1 level)
+        {
+            for (T1 j = 0; j < level; j++) cout << "  ";
+            cout<<info.key<<" (Id="<<info.ObjID<<")"<<endl;
+        }
+    );
+
+    // FirstThat
+    cout<<"\n=== FIRST THAT (ASC) ==="<<endl;
+    auto firstfound1 = btAsc.FirstThat(
+        [](decltype(btAsc)::ObjectInfo &info, T1) -> bool
+        {
+            return info.key > 'K';
+        });
+    if (firstfound1)
+        cout<<"Clave encontrada = "<<firstfound1->key<<", Id="<<firstfound1->ObjID<<endl;
+    else
+        cout<<"Clave no encontrada"<<endl;
+
+    cout.flush();
+
+    // UnifiedLoop (ForEach) 
+    cout<<"\n=== UNIFIEDLOOP COMO FOREACH (ASC) ==="<<endl;
+    btAsc.UnifiedLoop(
+        [](decltype(btAsc)::ObjectInfo& info, T1 level)
+        {
+            for (T1 j = 0; j < level; j++) cout << "  ";
+            cout<<info.key<<" (Id="<<info.ObjID<< ")"<<endl;
+        }
+    );
+
+    // UnifiedLoop (FirstThat)
+    cout<<"\n=== UNIFIEDLOOP COMO FIRSTTHAT (ASC) ==="<<endl;
+    auto* found = btAsc.UnifiedLoop(
+        [](decltype(btAsc)::ObjectInfo& info, T1) -> TBool
+        {
+            return info.key > 'J';
+        });
+    if (found)
+        cout<<"Clave encontrada = "<<found->key<<", Id="<<found->ObjID<<endl;
+    else
+        cout<<"Clave no encontrada"<<endl;
+
+    cout.flush();
+
+    // Iterators
+    cout<<"\n=== FORWARD ITERATOR (ASC) ==="<<endl;
+    for (auto it = btAsc.begin(); it != btAsc.end(); ++it)
+        cout<<"  "<<(*it).key<<" -> "<<(*it).ObjID<<endl;
+
+    cout<<"\n=== BACKWARD ITERATOR (ASC) ==="<<endl;
+    for (auto it = btAsc.rbegin(); it != btAsc.rend(); ++it)
+        cout<<"  "<<(*it).key<<" -> "<<(*it).ObjID<<endl;
+
+    // Operator >>
+    cout<<"\n=== OPERATOR >> ==="<<endl;
+    BTree<BTreeAscendingTrait<TChar>> btInput(BTreeSize);
+    TString inputData = "A:45 5:56 8:78 g:75";
+    cout<<"Input string: \""<<inputData<<"\""<<endl;
+
+    istringstream ss(inputData);
+    ss>>btInput;
+    cout<<"BTree despues del operador >>:"<<endl;
+    for (auto item: btInput)
+        cout<<item<<endl;
+
+    cout.flush();
+
+    // Operator <<
+    cout<<"\n=== OPERATOR << ==="<<endl;
+    cout<<btAsc;
+    cout.flush();
+
+    cout<<"\n=== FOREACH NATIVO ==="<<endl;
+    for (auto& item : btAsc)
+        cout<<item<<endl;
+
+    cout.flush();
 }
-
-
-
-
-
-
-
-
-
-/*const char * keys="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const char * keys2="CDAMPIWNBKEHOLJYQZFXVRTSGU";
-const int BTreeSize = 3;
-main (int argc, char * argv)
-{
-       //__int64 li;
-       BTree <__int64> bt (BTreeSize);
-       for (register int i = 0; i < 1000000; i++)
-       {
-               //cout<<"Inserting "<<keys[i]<<endl;
-               bt.Insert(i, i-1);
-               //bt.Print(cout);
-       }
-
-       for (i = 0; i < 1000; i++)
-       {
-               __int64 key = 975000+(::rand()%50000);
-               //cout << "Searching " << (long)key << " ";
-               long ObjID = bt.Search(key);
-               if( ObjID != -1 )
-                       cout << "Achei " << (long)key << " ID = " << ObjID << endl;
-               else
-                       cout <<"  Nao achei!" << (long)key << endl;
-       }
-       cout.flush();
-
-       return 1;
-}*/
-
-
-
-/*const int BTreeSize = 3;
-main (int argc, char * argv)
-{
-       int result, i;
-       BTree <LONGLONG> bt(BTreeSize);
-       result = bt.Create ("ernesto3-string-btree-start.dat",ios::in|ios::out);
-       if (!result) { cout<<"Please delete testbt.dat"<<endl;return 0; }
-       srand( (unsigned)time( NULL ) );
-       LARGE_INTEGER key;
-       for (i = 0; i < 1000000; i++)
-       {
-               //cout<<"Inserting "<<keys[i]<<endl;
-               char strTmp[50];
-               key.LowPart = rand();
-               key.HighPart = rand();
-               std::string str(strTmp);
-               result = bt.Insert(key.QuadPart, i);
-               //bt.Print(cout);
-               if( i % 100000 == 0 )
-               {       cout << i << endl; cout.flush();        }
-       }
-       //cout << "Searching D " << bt.Search();
-       //bt.Search(1,1);
-       cout.flush();
-       return 1;
-}*/
